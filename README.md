@@ -1,4 +1,4 @@
-# Setup inicial Python, Django, Django Rest Framework, Postgres e Pytest
+# Backend - Django + Django Rest Framework SME - GIPE
 
 ## 🥞 Stack
 - [Python v3.12](https://www.python.org/doc/)
