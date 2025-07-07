@@ -1,40 +1,121 @@
-from allauth.account.decorators import secure_admin_login
-from django.conf import settings
+from django import forms
 from django.contrib import admin
-from django.contrib.auth import admin as auth_admin
-from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm
+ 
+from .models import User, Cargo
 
-from .forms import UserAdminChangeForm
-from .forms import UserAdminCreationForm
-from .models import User
+User = get_user_model()
 
-if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
-    # Force the `admin` sign in process to go through the `django-allauth` workflow:
-    # https://docs.allauth.org/en/latest/common/admin.html#admin
-    admin.autodiscover()
-    admin.site.login = secure_admin_login(admin.site.login)  # type: ignore[method-assign]
 
+class CustomAdminPasswordChangeForm(AdminPasswordChangeForm):
+    """
+    Formulário personalizado para alteração de senha sem opção de desabilitar
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Remove o campo 'usable_password' se existir
+        if 'usable_password' in self.fields:
+            del self.fields['usable_password']
+    
+class CustomUserCreationForm(UserCreationForm):
+    """
+    Formulário personalizado para criação de usuários no admin
+    """
+
+    nome = forms.CharField(max_length=150, required=True)
+    cpf = forms.CharField(max_length=11, required=True)
+    login = forms.CharField(max_length=11, required=True)
+    cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = UserCreationForm.Meta.fields + ('nome', 'cpf', 'cargo')
+
+    def clean_cpf(self):
+        """Valida o CPF (apenas números)"""
+        cpf = self.cleaned_data.get('cpf')
+        if cpf and not cpf.isdigit():
+            raise ValidationError('CPF deve conter apenas números')
+        return cpf
+    
+class CustomUserChangeForm(UserChangeForm):
+    """
+    Formulário personalizado para alteração de usuários no admin
+    """
+
+    nome = forms.CharField(max_length=150, required=True)
+    cpf = forms.CharField(max_length=11, required=True)
+    login = forms.CharField(max_length=11, required=True)
+    cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
+
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = UserChangeForm.Meta.fields
+
+    def clean_cpf(self):
+        """Valida o CPF (apenas números)"""
+        cpf = self.cleaned_data.get('cpf')
+        if cpf and not cpf.isdigit():
+            raise ValidationError('CPF deve conter apenas números')
+        return cpf
+ 
 
 @admin.register(User)
-class UserAdmin(auth_admin.UserAdmin):
-    form = UserAdminChangeForm
-    add_form = UserAdminCreationForm
-    fieldsets = (
-        (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {"fields": ("name", "email")}),
-        (
-            _("Permissions"),
-            {
-                "fields": (
-                    "is_active",
-                    "is_staff",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                ),
-            },
-        ),
-        (_("Important dates"), {"fields": ("last_login", "date_joined")}),
+class UserAdmin(BaseUserAdmin):
+    """
+    Configuração do admin para o modelo User customizado
+    """
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+    change_password_form = CustomAdminPasswordChangeForm
+    # Campos exibidos na lista de usuários
+    list_display = ('username', 'nome', 'email', 'cargo', 'login')
+    search_fields = ('username', 'nome', 'email', 'cpf', 'login')
+    ordering = ('username',)
+    # Configuração dos fieldsets (formulário de edição)
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Informações Adicionais', {
+            'fields': ('nome', 'cpf', 'cargo', 'login', 'uuid')
+        }),
     )
-    list_display = ["username", "name", "is_superuser"]
-    search_fields = ["name"]
+    # Configuração dos fieldsets para criação
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'nome', 'cpf', 'cargo', 'login', 'password1', 'password2'),
+        }),
+        ('Permissões', {
+            'classes': ('wide',),
+            'fields': ('is_active', 'is_staff', 'is_superuser'),
+        }),
+    )
+    # Campos somente leitura
+    readonly_fields = ('uuid', 'date_joined', 'last_login')
+    def get_readonly_fields(self, request, obj=None):
+        """
+        Define campos somente leitura baseado no contexto
+        """
+        readonly_fields = list(self.readonly_fields)
+        # Se não é superuser, não pode alterar is_superuser
+        if not request.user.is_superuser:
+            readonly_fields.append('is_superuser')
+        return readonly_fields
+
+@admin.register(Cargo)
+class CargoAdmin(admin.ModelAdmin):
+    """
+    Configuração do admin para o modelo Cargo
+    """
+    list_display = ('codigo', 'nome')
+    search_fields = ('codigo', 'nome')
+    ordering = ('codigo',)
+    readonly_fields = ('uuid',)
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('codigo', 'nome', 'uuid')
+        }),
+    )
