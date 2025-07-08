@@ -28,12 +28,11 @@ class CustomUserCreationForm(UserCreationForm):
 
     nome = forms.CharField(max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
-    login = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + ('nome', 'cpf', 'cargo')
+        fields = UserCreationForm.Meta.fields + ('name', 'cpf', 'cargo')
 
     def clean_cpf(self):
         """Valida o CPF (apenas números)"""
@@ -49,7 +48,6 @@ class CustomUserChangeForm(UserChangeForm):
 
     nome = forms.CharField(max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
-    login = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
 
     class Meta(UserChangeForm.Meta):
@@ -73,20 +71,20 @@ class UserAdmin(BaseUserAdmin):
     add_form = CustomUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
     # Campos exibidos na lista de usuários
-    list_display = ('username', 'nome', 'email', 'cargo', 'login')
-    search_fields = ('username', 'nome', 'email', 'cpf', 'login')
+    list_display = ('username', 'name', 'email', 'cargo')
+    search_fields = ('username', 'name', 'email', 'cpf')
     ordering = ('username',)
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {
-            'fields': ('nome', 'cpf', 'cargo', 'login', 'uuid')
+            'fields': ('name', 'cpf', 'cargo', 'uuid')
         }),
     )
     # Configuração dos fieldsets para criação
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'nome', 'cpf', 'cargo', 'login', 'password1', 'password2'),
+            'fields': ('username', 'name', 'cpf', 'cargo', 'password1', 'password2'),
         }),
         ('Permissões', {
             'classes': ('wide',),
