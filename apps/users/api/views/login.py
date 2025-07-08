@@ -1,12 +1,19 @@
 import logging
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from apps.users.services.login import AutenticacaoService
+
+# from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.db import transaction, IntegrityError, DatabaseError
+
+from apps.users.models import Cargo
 from apps.users.services.cargos import CargosService
+from apps.users.services.login import AutenticacaoService
 from apps.helpers.exceptions import AuthenticationError, UserNotFoundError
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 class LoginView(TokenObtainPairView):
@@ -38,9 +45,9 @@ class LoginView(TokenObtainPairView):
             )
         
         try:
-            auth_data = self._authenticate_user(login, senha)
+            auth_data = self._authenticate_user(login, senha)  
             cargo_data = self._get_user_cargo(auth_data['login'])
-            user_data = self._build_user_response(auth_data, cargo_data)
+            user_data = self._build_user_response(senha, auth_data, cargo_data)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -86,9 +93,62 @@ class LoginView(TokenObtainPairView):
         
         return cargo_permitido
     
-    def _build_user_response(self, auth_data: dict, cargo_data: dict) -> dict:
-        """Monta resposta com dados do usuário"""
+    def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+        """
+        Cria ou atualiza um cargo e um usuário associado a ele, garantindo que ambas operações 
+        ocorram juntas de forma segura.
+        """
+
+        try:
+            with transaction.atomic():
+                # Criação/atualização do cargo
+                cargo, _ = Cargo.objects.update_or_create(
+                    codigo=cargo_data['codigo'],
+                    defaults={
+                        'nome': cargo_data['nome']
+                    }
+                )
+
+                # Criação/atualização do usuário com o cargo
+                user, _ = User.objects.update_or_create(
+                    username=auth_data['login'],
+                    defaults={
+                        'name': auth_data['nome'],
+                        'cpf': auth_data['cpf'],
+                        'email': auth_data['email'],
+                        'password': senha,
+                        'cargo': cargo
+                    }
+                )
+                return user
+
+        except IntegrityError as e:
+            logger.error(f'Erro de integridade no banco de dados: {e}')
+            raise Exception('Erro de integridade ao salvar os dados. Verifique se já existem registros conflitantes.')
+
+        except DatabaseError as e:
+            logger.error(f'Erro geral de banco de dados: {e}')
+            raise Exception('Erro no banco de dados. Tente novamente mais tarde.')
+
+        except Exception as e:
+            logger.error(f'Erro inesperado: {e}')
+            raise Exception('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
         
+    def _generate_token(self, user: dict) -> dict:
+        """Gera tokens JWT para o usuário"""
+
+        refresh = RefreshToken.for_user(user)
+        return {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        }
+    
+    def _build_user_response(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+        """Monta resposta com dados do usuário"""
+            
+        _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+        # Gera tokens JWT
+        tokens = self._generate_token(_user)
         return {
             "name": auth_data.get('nome', ''),
             "email": auth_data.get('email', ''),
@@ -96,8 +156,8 @@ class LoginView(TokenObtainPairView):
             "login": auth_data.get('login', ''),
             "visoes": auth_data.get('visoes', []),
             "cargo": {
-                "codigo": cargo_data.get('codigo'),
-                "nome": cargo_data.get('nome', '')
+                "codigo": _user.cargo.codigo,
+                "nome": _user.cargo.nome
             },
-            "token": ""  # TODO: Implementar geração de token
+            "token": tokens['access']
         }
