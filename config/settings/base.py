@@ -5,6 +5,7 @@
 from pathlib import Path
 
 import environ
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # apps/
@@ -311,6 +312,14 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    # 'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
