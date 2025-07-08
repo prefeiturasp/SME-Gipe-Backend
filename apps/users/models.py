@@ -8,10 +8,9 @@ class User(AbstractUser):
     Modelo de usuário customizado do sistema
     """
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, null=True)
-    nome = models.CharField("Nome", max_length=150)
+    name = models.CharField("Nome", max_length=150)
     cpf = models.CharField("CPF", max_length=11, unique=True)
     email = models.EmailField("E-mail", max_length=254, null=True, blank=True, default="")
-    login = models.CharField("Login", max_length=11, unique=True)
     cargo = models.ForeignKey(
         'Cargo',
         on_delete=models.PROTECT,
