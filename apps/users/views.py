@@ -15,9 +15,7 @@ class UserDetailView(LoginRequiredMixin, DetailView):
     slug_field = "username"
     slug_url_kwarg = "username"
 
-
 user_detail_view = UserDetailView.as_view()
-
 
 class UserUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = User
@@ -25,16 +23,14 @@ class UserUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     success_message = _("Information successfully updated")
 
     def get_success_url(self) -> str:
-        assert self.request.user.is_authenticated  # type guard
-        return self.request.user.get_absolute_url()
+        assert self.request.user.is_authenticated
+        return reverse("users:detail", kwargs={"username": self.request.user.username})
 
     def get_object(self, queryset: QuerySet | None=None) -> User:
-        assert self.request.user.is_authenticated  # type guard
+        assert self.request.user.is_authenticated
         return self.request.user
 
-
 user_update_view = UserUpdateView.as_view()
-
 
 class UserRedirectView(LoginRequiredMixin, RedirectView):
     permanent = False

@@ -4,7 +4,6 @@ from rest_framework import permissions, status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-# from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError, DatabaseError
 
@@ -116,10 +115,13 @@ class LoginView(TokenObtainPairView):
                         'name': auth_data['nome'],
                         'cpf': auth_data['cpf'],
                         'email': auth_data['email'],
-                        'password': senha,
                         'cargo': cargo
                     }
                 )
+
+                user.set_password(senha)
+                user.save()
+
                 return user
 
         except IntegrityError as e:

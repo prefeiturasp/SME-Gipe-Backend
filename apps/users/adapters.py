@@ -6,7 +6,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 
-if typing.TYPE_CHECKING:
+if typing.TYPE_CHECKING: # pragma: no cover
     from allauth.socialaccount.models import SocialLogin
     from django.http import HttpRequest
 
