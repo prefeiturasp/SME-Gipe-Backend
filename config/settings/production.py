@@ -12,19 +12,20 @@ from .base import env
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 # Atualizado para refletir o domínio real
-ALLOWED_HOSTS = ["qa-gipe.sme.prefeitura.sp.gov.br"]
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 
 # CORS (Cross-Origin Resource Sharing)
 # ------------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = [
-    "https://qa-gipe.sme.prefeitura.sp.gov.br",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "https://qa-gipe.sme.prefeitura.sp.gov.br",
+# ]
 
 # CSRF (Cross-Site Request Forgery)
 # ------------------------------------------------------------------------------
-CSRF_TRUSTED_ORIGINS = [
-    "https://qa-gipe.sme.prefeitura.sp.gov.br",
-]
+CSRF_TRUSTED_ORIGINS = env.str('CSRF_TRUSTED_ORIGINS', default='https://*.sme.prefeitura.sp.gov.br').split(',')
+# CSRF_TRUSTED_ORIGINS = [
+#     "https://qa-gipe.sme.prefeitura.sp.gov.br",
+# ]
 
 # DATABASES
 # ------------------------------------------------------------------------------
