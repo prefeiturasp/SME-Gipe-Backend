@@ -77,37 +77,37 @@ STORAGES = {
 # EMAIL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
-DEFAULT_FROM_EMAIL = env(
-    "DJANGO_DEFAULT_FROM_EMAIL",
-    default="Django-DRF-Setup-Inicial <noreply@example.com>",
-)
-# https://docs.djangoproject.com/en/dev/ref/settings/#server-email
-SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
-# https://docs.djangoproject.com/en/dev/ref/settings/#email-subject-prefix
-EMAIL_SUBJECT_PREFIX = env(
-    "DJANGO_EMAIL_SUBJECT_PREFIX",
-    default="[Django-DRF-Setup-Inicial] ",
-)
-ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
+# DEFAULT_FROM_EMAIL = env(
+#     "DJANGO_DEFAULT_FROM_EMAIL",
+#     default="Django-DRF-Setup-Inicial <noreply@example.com>",
+# )
+# # https://docs.djangoproject.com/en/dev/ref/settings/#server-email
+# SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+# # https://docs.djangoproject.com/en/dev/ref/settings/#email-subject-prefix
+# EMAIL_SUBJECT_PREFIX = env(
+#     "DJANGO_EMAIL_SUBJECT_PREFIX",
+#     default="[Django-DRF-Setup-Inicial] ",
+# )
+# ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 
-# ADMIN
-# ------------------------------------------------------------------------------
-# Django Admin URL regex.
-ADMIN_URL = env("DJANGO_ADMIN_URL")
+# # ADMIN
+# # ------------------------------------------------------------------------------
+# # Django Admin URL regex.
+# ADMIN_URL = env("DJANGO_ADMIN_URL")
 
-# Anymail
-# ------------------------------------------------------------------------------
-# https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
-INSTALLED_APPS += ["anymail"]
-# https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-# https://anymail.readthedocs.io/en/stable/installation/#anymail-settings-reference
-# https://anymail.readthedocs.io/en/stable/esps/mailgun/
-EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
-ANYMAIL = {
-    "MAILGUN_API_KEY": env("MAILGUN_API_KEY"),
-    "MAILGUN_SENDER_DOMAIN": env("MAILGUN_DOMAIN"),
-    "MAILGUN_API_URL": env("MAILGUN_API_URL", default="https://api.mailgun.net/v3"),
-}
+# # Anymail
+# # ------------------------------------------------------------------------------
+# # https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
+# INSTALLED_APPS += ["anymail"]
+# # https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
+# # https://anymail.readthedocs.io/en/stable/installation/#anymail-settings-reference
+# # https://anymail.readthedocs.io/en/stable/esps/mailgun/
+# EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+# ANYMAIL = {
+#     "MAILGUN_API_KEY": env("MAILGUN_API_KEY"),
+#     "MAILGUN_SENDER_DOMAIN": env("MAILGUN_DOMAIN"),
+#     "MAILGUN_API_URL": env("MAILGUN_API_URL", default="https://api.mailgun.net/v3"),
+# }
 
 
 # LOGGING
