@@ -68,5 +68,5 @@ INSTALLED_APPS += ["django_extensions"]
 # django-cors-headers
 # ------------------------------------------------------------------------------
 # https://github.com/adamchainz/django-cors-headers
-MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware"] + MIDDLEWARE
-CORS_ALLOW_ALL_ORIGINS = True
+# MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware"] + MIDDLEWARE
+# CORS_ALLOW_ALL_ORIGINS = True
