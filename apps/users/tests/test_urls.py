@@ -7,16 +7,21 @@ from apps.users.models import User
 def test_detail(user: User):
     assert (
         reverse("users:detail", kwargs={"username": user.username})
-        == f"/users/{user.username}/"
+        == f"/api/users/{user.username}/"
     )
-    assert resolve(f"/users/{user.username}/").view_name == "users:detail"
+    assert resolve(f"/api/users/{user.username}/").view_name == "users:detail"
 
 
 def test_update():
-    assert reverse("users:update") == "/users/~update/"
-    assert resolve("/users/~update/").view_name == "users:update"
+    assert reverse("users:update") == "/api/users/~update/"
+    assert resolve("/api/users/~update/").view_name == "users:update"
 
 
 def test_redirect():
-    assert reverse("users:redirect") == "/users/~redirect/"
-    assert resolve("/users/~redirect/").view_name == "users:redirect"
+    assert reverse("users:redirect") == "/api/users/~redirect/"
+    assert resolve("/api/users/~redirect/").view_name == "users:redirect"
+
+
+def test_login():
+    assert reverse("users:login") == "/api/users/login"
+    assert resolve("/api/users/login").view_name == "users:login"
