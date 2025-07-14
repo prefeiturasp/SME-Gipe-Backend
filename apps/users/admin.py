@@ -26,7 +26,7 @@ class CustomUserCreationForm(UserCreationForm):
     Formulário personalizado para criação de usuários no admin
     """
 
-    name = forms.CharField(max_length=150, required=True)
+    name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
 
@@ -46,7 +46,7 @@ class CustomUserChangeForm(UserChangeForm):
     Formulário personalizado para alteração de usuários no admin
     """
 
-    nome = forms.CharField(max_length=150, required=True)
+    name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
 
