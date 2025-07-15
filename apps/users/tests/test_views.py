@@ -15,21 +15,19 @@ pytestmark = pytest.mark.django_db
 
 
 class TestUserUpdateView:
-    
+
     def dummy_get_response(self, request: HttpRequest):
         return None
 
     def test_get_success_url(self, user: User, rf: RequestFactory):
-
         view = UserUpdateView()
         request = rf.get("/fake-url/")
         request.user = user
         view.request = request
 
-        assert view.get_success_url() == f"/users/{user.username}/"
+        assert view.get_success_url() == f"/api/users/{user.username}/"
 
     def test_get_object(self, user: User, rf: RequestFactory):
-
         view = UserUpdateView()
         request = rf.get("/fake-url/")
         request.user = user
@@ -38,7 +36,6 @@ class TestUserUpdateView:
         assert view.get_object() == user
 
     def test_post_valid_data(self, client, user: User):
-
         client.force_login(user)
         url = reverse("users:update")
         response = client.post(url, {"name": "Novo Nome"})
@@ -48,7 +45,6 @@ class TestUserUpdateView:
         assert user.name == "Novo Nome"
 
     def test_post_invalid_data(self, client, user: User):
-
         client.force_login(user)
         url = reverse("users:update")
         response = client.post(url, {"name": ""})
@@ -57,7 +53,6 @@ class TestUserUpdateView:
         assert "name" in response.context["form"].errors
 
     def test_success_message(self, client, user: User):
-
         client.force_login(user)
         url = reverse("users:update")
         response = client.post(url, {"name": "Teste Mensagem"}, follow=True)
@@ -69,19 +64,17 @@ class TestUserUpdateView:
 class TestUserRedirectView:
 
     def test_get_redirect_url(self, user: User, rf: RequestFactory):
-
         view = UserRedirectView()
         request = rf.get("/fake-url")
         request.user = user
         view.request = request
 
-        assert view.get_redirect_url() == f"/users/{user.username}/"
+        assert view.get_redirect_url() == f"/api/users/{user.username}/"
 
 
 class TestUserDetailView:
 
     def test_authenticated(self, user: User, rf: RequestFactory):
-
         request = rf.get("/fake-url/")
         request.user = user
         response = user_detail_view(request, username=user.username)
@@ -89,7 +82,6 @@ class TestUserDetailView:
         assert response.status_code == HTTPStatus.OK
 
     def test_not_authenticated(self, user: User, rf: RequestFactory):
-
         request = rf.get("/fake-url/")
         request.user = AnonymousUser()
         response = user_detail_view(request, username=user.username)
