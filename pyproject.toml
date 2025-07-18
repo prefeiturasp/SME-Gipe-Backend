@@ -10,7 +10,7 @@ python_files = [
 # ==== Coverage ====
 [tool.coverage.run]
 include = ["apps/**"]
-omit = ["*/migrations/*", "*/tests/*"]
+omit = ["*/migrations/*", "*/tests/*", "*/templates/*"]
 plugins = ["django_coverage_plugin"]
 
 # ==== mypy ====
