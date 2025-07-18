@@ -149,15 +149,15 @@ class LoginView(TokenObtainPairView):
 
         except IntegrityError as e:
             logger.error(f'Erro de integridade no banco de dados: {e}')
-            raise Exception('Erro de integridade ao salvar os dados. Verifique se já existem registros conflitantes.')
+            raise IntegrityError('Erro de integridade ao salvar os dados. Verifique se já existem registros conflitantes.')
 
         except DatabaseError as e:
             logger.error(f'Erro geral de banco de dados: {e}')
-            raise Exception('Erro no banco de dados. Tente novamente mais tarde.')
+            raise DatabaseError('Erro no banco de dados. Tente novamente mais tarde.')
 
         except Exception as e:
             logger.error(f'Erro inesperado: {e}')
-            raise Exception('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
+            raise DatabaseError('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
         
     def _generate_token(self, user: dict) -> dict:
         """Gera tokens JWT para o usuário"""
