@@ -78,20 +78,43 @@ class LoginView(TokenObtainPairView):
     
     def _get_user_cargo(self, rf: str) -> dict:
         """Busca e valida cargo do usuário"""
+
         # Busca cargos no EOL
         cargos_data = CargosService.get_cargos(rf)
-        
+
         # Busca cargo permitido
         cargo_permitido = CargosService.get_cargo_permitido(cargos_data)
-        
+
         if not cargo_permitido:
+            if cargo_alternativo := self._get_cargo_gipe_ou_ponto_focal(rf):
+                logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
+                return cargo_alternativo
+            
             cargos_disponiveis = cargos_data.get('cargos', [])
-            logger.info("Cargo não permitido. Cargos disponíveis: %s", 
-                       [c.get('codigo') for c in cargos_disponiveis])
+            logger.info("Cargo não permitido. Cargos disponíveis: %s", [c.get('codigo') for c in cargos_disponiveis])
             raise UserNotFoundError("Acesso restrito a perfis específicos")
-        
+
         return cargo_permitido
-    
+
+    def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
+        """
+        Retorna o cargo se o usuário for GIPE ou PONTO FOCAL DRE, senão None
+        """
+
+        try:
+            usuario = User.objects.get(username=rf)
+
+            if usuario.cargo.codigo in [0, 1]:
+                return {
+                    'codigo': usuario.cargo.codigo,
+                    'nome': usuario.cargo.nome
+                }
+            
+        except User.DoesNotExist:
+            logger.warning("Usuário com RF %s não encontrado no model User", rf)
+
+        return None
+
     def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
         """
         Cria ou atualiza um cargo e um usuário associado a ele, garantindo que ambas operações 
