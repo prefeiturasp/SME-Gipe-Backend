@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 from apps.users.api.views.login import LoginView
 from apps.helpers.exceptions import AuthenticationError
 from django.db import IntegrityError, DatabaseError
+from apps.users.models import User, Cargo
 
 
 class TestLoginView:
@@ -15,7 +16,6 @@ class TestLoginView:
     @patch("apps.users.api.views.login.LoginView.create_or_update_user_with_cargo")
     @patch("apps.users.api.views.login.LoginView._generate_token")
     def test_login_sucesso(self, mock_generate_token, mock_create_update, mock_autentica, mock_get_cargos, mock_get_cargo_permitido):
-
         mock_autentica.return_value = {
             "nome": "João Silva",
             "email": "joao@email.com",
@@ -44,7 +44,6 @@ class TestLoginView:
         assert response.data["token"] == 'token-acesso'
 
     def test_login_sem_credenciais(self):
-
         factory = APIRequestFactory()
         request = factory.post("/api/login", {"username": "", "password": ""}, format='json')
 
@@ -55,7 +54,6 @@ class TestLoginView:
 
     @patch("apps.users.services.login.AutenticacaoService.autentica", side_effect=AuthenticationError("Credenciais inválidas"))
     def test_login_credenciais_invalidas(self, mock_autentica):
-
         factory = APIRequestFactory()
         request = factory.post("/api/login", {"username": "usuario", "password": "senha_errada"}, format='json')
 
@@ -67,8 +65,8 @@ class TestLoginView:
     @patch("apps.users.services.login.AutenticacaoService.autentica")
     @patch("apps.users.services.cargos.CargosService.get_cargos")
     @patch("apps.users.services.cargos.CargosService.get_cargo_permitido", return_value=None)
-    def test_login_usuario_sem_cargo_permitido(self, mock_get_cargo_permitido, mock_get_cargos, mock_autentica):
-
+    @patch("apps.users.api.views.login.LoginView._get_cargo_gipe_ou_ponto_focal", return_value=None)
+    def test_login_usuario_sem_cargo_permitido(self, mock_get_cargo_alt, mock_get_cargo_permitido, mock_get_cargos, mock_autentica):
         auth_data = {
             "nome": "Maria Souza",
             "email": "maria@email.com",
@@ -89,7 +87,6 @@ class TestLoginView:
 
     @patch("apps.users.services.login.AutenticacaoService.autentica", side_effect=Exception("Erro inesperado"))
     def test_erro_interno(self, mock_autentica):
-
         factory = APIRequestFactory()
         request = factory.post("/api/login", {"username": "usuario", "password": "senha"}, format='json')
 
@@ -102,7 +99,6 @@ class TestLoginView:
     @patch("apps.users.api.views.login.User.objects.update_or_create")
     @patch("apps.users.api.views.login.Cargo.objects.update_or_create")
     def test_create_or_update_user_with_cargo_success(self, mock_cargo_update_or_create, mock_user_update_or_create):
-
         mock_cargo = MagicMock()
         mock_cargo_update_or_create.return_value = (mock_cargo, True)
 
@@ -132,7 +128,6 @@ class TestLoginView:
 
     @patch("apps.users.models.Cargo.objects.update_or_create", side_effect=Exception("Erro inesperado no DB"))
     def test_create_or_update_user_with_cargo_db_error(self, mock_cargo_update_or_create):
-
         view = LoginView()
         senha = "senha123"
         auth_data = {
@@ -155,7 +150,6 @@ class TestLoginView:
     @patch("apps.users.api.views.login.User.objects.update_or_create")
     @patch("apps.users.api.views.login.Cargo.objects.update_or_create")
     def test_create_or_update_user_with_cargo_integrity_error(self, mock_cargo_update_or_create, mock_user_update_or_create):
-
         mock_cargo_update_or_create.side_effect = IntegrityError("Integrity error")
 
         view = LoginView()
@@ -180,7 +174,6 @@ class TestLoginView:
     @patch("apps.users.api.views.login.User.objects.update_or_create")
     @patch("apps.users.api.views.login.Cargo.objects.update_or_create")
     def test_create_or_update_user_with_cargo_database_error(self, mock_cargo_update_or_create, mock_user_update_or_create):
-
         mock_cargo_update_or_create.side_effect = DatabaseError("Database error")
 
         view = LoginView()
@@ -205,7 +198,6 @@ class TestLoginView:
     @patch("apps.users.api.views.login.User.objects.update_or_create")
     @patch("apps.users.api.views.login.Cargo.objects.update_or_create")
     def test_create_or_update_user_with_cargo_unexpected_error(self, mock_cargo_update_or_create, mock_user_update_or_create):
-
         mock_cargo_update_or_create.side_effect = Exception("Unexpected error")
 
         view = LoginView()
@@ -227,7 +219,6 @@ class TestLoginView:
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
     def test_generate_token(self):
-
         view = LoginView()
 
         mock_user = MagicMock()
@@ -240,3 +231,73 @@ class TestLoginView:
 
         assert tokens == {'access': 'access-token', 'refresh': 'refresh-token'}
         mock_for_user.assert_called_once_with(mock_user)
+
+    @patch("apps.users.services.login.AutenticacaoService.autentica")
+    @patch("apps.users.services.cargos.CargosService.get_cargos")
+    @patch("apps.users.services.cargos.CargosService.get_cargo_permitido", return_value=None)
+    @patch("apps.users.api.views.login.LoginView._get_cargo_gipe_ou_ponto_focal")
+    @patch("apps.users.api.views.login.LoginView.create_or_update_user_with_cargo")
+    @patch("apps.users.api.views.login.LoginView._generate_token")
+    def test_login_com_cargo_alternativo_gipe_ou_ponto_focal(self, mock_generate_token, mock_create_update, mock_get_cargo_alt, mock_get_cargo_permitido, mock_get_cargos, mock_autentica):
+        auth_data = {
+            "nome": "Carlos Dias",
+            "email": "carlos@email.com",
+            "cpf": "11122233344",
+            "login": "carlosd",
+            "visoes": []
+        }
+        mock_autentica.return_value = auth_data
+        mock_get_cargos.return_value = {"cargos": [{"codigo": 40, "nome": "Outro Cargo"}]}
+        mock_get_cargo_alt.return_value = {"codigo": 0, "nome": "GIPE"}
+
+        user_mock = MagicMock()
+        user_mock.cargo.codigo = 0
+        user_mock.cargo.nome = "GIPE"
+        mock_create_update.return_value = user_mock
+        mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
+
+        factory = APIRequestFactory()
+        request = factory.post("/api/login", {"username": "carlosd", "password": "senha"}, format='json')
+
+        response = LoginView.as_view()(request)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["cargo"]["nome"] == "GIPE"
+        assert response.data["token"] == "token-acesso"
+
+
+class TestCargoAlternativo:
+
+    @pytest.mark.django_db
+    def test_get_cargo_gipe_ou_ponto_focal_sucesso(self):
+        cargo_real = Cargo.objects.create(nome='GIPE', codigo=0)
+        usuario = User.objects.create_user(username='testeuser', password='teste123')
+        usuario.cargo = cargo_real
+        usuario.save()
+
+        view = LoginView()
+        with patch("apps.users.api.views.login.User.objects.get", return_value=usuario):
+            result = view._get_cargo_gipe_ou_ponto_focal('testeuser')
+
+        assert result == {'codigo': 0, 'nome': 'GIPE'}
+
+    @pytest.mark.django_db
+    def test_get_cargo_gipe_ou_ponto_focal_nao_encontrado(self):
+        view = LoginView()
+        with patch("apps.users.api.views.login.User.objects.get", side_effect=User.DoesNotExist):
+            result = view._get_cargo_gipe_ou_ponto_focal('naoexiste')
+
+        assert result is None
+
+    @pytest.mark.django_db
+    def test_get_cargo_gipe_ou_ponto_focal_usuario_sem_cargo_valido(self):
+        cargo_real = Cargo.objects.create(nome='Outro Cargo', codigo=2)
+        usuario = User.objects.create_user(username='usuario', password='teste123')
+        usuario.cargo = cargo_real
+        usuario.save()
+
+        view = LoginView()
+        with patch("apps.users.api.views.login.User.objects.get", return_value=usuario):
+            result = view._get_cargo_gipe_ou_ponto_focal('usuario')
+
+        assert result is None

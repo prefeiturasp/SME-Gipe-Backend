@@ -28,7 +28,7 @@ class CustomUserCreationForm(UserCreationForm):
 
     name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
-    cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
+    cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
 
     class Meta(UserCreationForm.Meta):
         model = User
@@ -48,7 +48,7 @@ class CustomUserChangeForm(UserChangeForm):
 
     name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
-    cargo = forms.ModelChoiceField(queryset=Cargo.objects.all(), required=True)
+    cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
 
     class Meta(UserChangeForm.Meta):
         model = User
