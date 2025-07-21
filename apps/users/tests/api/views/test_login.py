@@ -40,7 +40,7 @@ class TestLoginView:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["name"] == "João Silva"
-        assert response.data["cargo"]["codigo"] == 30
+        assert response.data["perfil_acesso"]["codigo"] == 30
         assert response.data["token"] == 'token-acesso'
 
     def test_login_sem_credenciais(self):
@@ -262,11 +262,14 @@ class TestLoginView:
         response = LoginView.as_view()(request)
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["cargo"]["nome"] == "GIPE"
+        assert response.data["perfil_acesso"]["nome"] == "GIPE"
         assert response.data["token"] == "token-acesso"
 
 
 class TestCargoAlternativo:
+
+    def setup_method(self):
+        self.view = LoginView()
 
     @pytest.mark.django_db
     def test_get_cargo_gipe_ou_ponto_focal_sucesso(self):
@@ -301,3 +304,20 @@ class TestCargoAlternativo:
             result = view._get_cargo_gipe_ou_ponto_focal('usuario')
 
         assert result is None
+
+    def test_get_unidade_lotacao_return_unidadeExercicio():
+        view = LoginView()
+        cargos_data = {
+            "unidadeExercicio": {"codigo": 1, "nome": "Unidade X"},
+            "unidadesLotacao": [{"codigo": 2, "nome": "Unidade Y"}]
+        }
+        resultado = view._get_unidade_lotacao(cargos_data)
+        assert resultado == {"codigo": 1, "nome": "Unidade X"}
+
+    def test_get_unidade_lotacao_return_unidadeExercicio(self):
+        cargos_data = {
+            "unidadeExercicio": {"codigo": 1, "nome": "Unidade X"},
+            "unidadesLotacao": [{"codigo": 2, "nome": "Unidade Y"}]
+        }
+        resultado = self.view._get_unidade_lotacao(cargos_data)
+        assert resultado == {"codigo": 1, "nome": "Unidade X"}
