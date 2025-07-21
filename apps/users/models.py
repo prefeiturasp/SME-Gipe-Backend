@@ -43,11 +43,11 @@ class Cargo(models.Model):
     """
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, null=True)
     codigo = models.IntegerField(unique=True, primary_key=True, help_text="Código único do cargo")
-    nome = models.CharField(max_length=100, help_text="Nome do cargo")
+    nome = models.CharField(max_length=100, help_text="Perfil de acesso")
 
     class Meta:
-        verbose_name = "Cargo"
-        verbose_name_plural = "Cargos"
+        verbose_name = "Perfil de Acesso"
+        verbose_name_plural = "Perfis de Acesso"
         ordering = ['nome']
 
     def __str__(self):
