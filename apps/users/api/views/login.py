@@ -45,8 +45,10 @@ class LoginView(TokenObtainPairView):
         
         try:
             auth_data = self._authenticate_user(login, senha)  
-            cargo_data = self._get_user_cargo(auth_data['login'])
-            user_data = self._build_user_response(senha, auth_data, cargo_data)
+            eol_data = self._get_user_cargo(login)
+            cargo_autorizado = self._valida_cargo_permitido(login, eol_data)
+            unidade_lotacao = self._get_unidade_lotacao(eol_data)
+            user_data = self._build_user_response(senha, auth_data, cargo_autorizado, unidade_lotacao)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -78,21 +80,53 @@ class LoginView(TokenObtainPairView):
     
     def _get_user_cargo(self, rf: str) -> dict:
         """Busca e valida cargo do usuário"""
-        # Busca cargos no EOL
-        cargos_data = CargosService.get_cargos(rf)
-        
+        return CargosService.get_cargos(rf)
+
+    def _valida_cargo_permitido(self, rf: int, eol_data: dict) -> dict:
+        """Valida se o usuário possui um cargo autorizado para acesso ao sistema."""
+
         # Busca cargo permitido
-        cargo_permitido = CargosService.get_cargo_permitido(cargos_data)
-        
+        cargo_permitido = CargosService.get_cargo_permitido(eol_data)
+
         if not cargo_permitido:
-            cargos_disponiveis = cargos_data.get('cargos', [])
-            logger.info("Cargo não permitido. Cargos disponíveis: %s", 
-                       [c.get('codigo') for c in cargos_disponiveis])
+            if cargo_alternativo := self._get_cargo_gipe_ou_ponto_focal(rf):
+                logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
+                return cargo_alternativo
+            
+            cargos_disponiveis = eol_data.get('cargos', [])
+            logger.info("Cargo não permitido. Cargos disponíveis: %s", [c.get('codigo') for c in cargos_disponiveis])
             raise UserNotFoundError("Acesso restrito a perfis específicos")
-        
+
         return cargo_permitido
-    
-    def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+
+    def _get_unidade_lotacao(self, eol_data: dict) -> dict:
+        """Retorna a unidade de lotação com base nos dados recebidos."""
+
+        unidade_lotacao = eol_data.get('unidadeExercicio') or eol_data.get('unidadesLotacao', [])
+        if isinstance(unidade_lotacao, list):
+            return unidade_lotacao[0] if unidade_lotacao else {}
+        return unidade_lotacao
+
+    def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
+        """
+        Retorna o cargo se o usuário for GIPE ou PONTO FOCAL DRE, senão None
+        """
+
+        try:
+            usuario = User.objects.get(username=rf)
+
+            if usuario.cargo.codigo in [0, 1]:
+                return {
+                    'codigo': usuario.cargo.codigo,
+                    'nome': usuario.cargo.nome
+                }
+            
+        except User.DoesNotExist:
+            logger.warning("Usuário com RF %s não encontrado no model User", rf)
+
+        return None
+
+    def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """
         Cria ou atualiza um cargo e um usuário associado a ele, garantindo que ambas operações 
         ocorram juntas de forma segura.
@@ -102,9 +136,9 @@ class LoginView(TokenObtainPairView):
             with transaction.atomic():
                 # Criação/atualização do cargo
                 cargo, _ = Cargo.objects.update_or_create(
-                    codigo=cargo_data['codigo'],
+                    codigo=cargo_autorizado['codigo'],
                     defaults={
-                        'nome': cargo_data['nome']
+                        'nome': cargo_autorizado['nome']
                     }
                 )
 
@@ -126,15 +160,15 @@ class LoginView(TokenObtainPairView):
 
         except IntegrityError as e:
             logger.error(f'Erro de integridade no banco de dados: {e}')
-            raise Exception('Erro de integridade ao salvar os dados. Verifique se já existem registros conflitantes.')
+            raise IntegrityError('Erro de integridade ao salvar os dados. Verifique se já existem registros conflitantes.')
 
         except DatabaseError as e:
             logger.error(f'Erro geral de banco de dados: {e}')
-            raise Exception('Erro no banco de dados. Tente novamente mais tarde.')
+            raise DatabaseError('Erro no banco de dados. Tente novamente mais tarde.')
 
         except Exception as e:
             logger.error(f'Erro inesperado: {e}')
-            raise Exception('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
+            raise DatabaseError('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
         
     def _generate_token(self, user: dict) -> dict:
         """Gera tokens JWT para o usuário"""
@@ -145,10 +179,11 @@ class LoginView(TokenObtainPairView):
             'refresh': str(refresh),
         }
     
-    def _build_user_response(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict, unidade_lotacao: dict) -> dict:
         """Monta resposta com dados do usuário"""
             
-        _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+        _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_autorizado)
+
         # Gera tokens JWT
         tokens = self._generate_token(_user)
         return {
@@ -157,9 +192,10 @@ class LoginView(TokenObtainPairView):
             "cpf": auth_data.get('cpf', ''),
             "login": auth_data.get('login', ''),
             "visoes": auth_data.get('visoes', []),
-            "cargo": {
+            "perfil_acesso": {
                 "codigo": _user.cargo.codigo,
                 "nome": _user.cargo.nome
             },
+            "unidade_lotacao": unidade_lotacao,
             "token": tokens['access']
         }
