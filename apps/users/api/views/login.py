@@ -45,8 +45,10 @@ class LoginView(TokenObtainPairView):
         
         try:
             auth_data = self._authenticate_user(login, senha)  
-            cargo_data = self._get_user_cargo(auth_data['login'])
-            user_data = self._build_user_response(senha, auth_data, cargo_data)
+            eol_data = self._get_user_cargo(login)
+            cargo_autorizado = self._valida_cargo_permitido(login, eol_data)
+            unidade_lotacao = self._get_unidade_lotacao(eol_data)
+            user_data = self._build_user_response(senha, auth_data, cargo_autorizado, unidade_lotacao)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -78,23 +80,32 @@ class LoginView(TokenObtainPairView):
     
     def _get_user_cargo(self, rf: str) -> dict:
         """Busca e valida cargo do usuário"""
+        return CargosService.get_cargos(rf)
 
-        # Busca cargos no EOL
-        cargos_data = CargosService.get_cargos(rf)
+    def _valida_cargo_permitido(self, rf: int, eol_data: dict) -> dict:
+        """Valida se o usuário possui um cargo autorizado para acesso ao sistema."""
 
         # Busca cargo permitido
-        cargo_permitido = CargosService.get_cargo_permitido(cargos_data)
+        cargo_permitido = CargosService.get_cargo_permitido(eol_data)
 
         if not cargo_permitido:
             if cargo_alternativo := self._get_cargo_gipe_ou_ponto_focal(rf):
                 logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
                 return cargo_alternativo
             
-            cargos_disponiveis = cargos_data.get('cargos', [])
+            cargos_disponiveis = eol_data.get('cargos', [])
             logger.info("Cargo não permitido. Cargos disponíveis: %s", [c.get('codigo') for c in cargos_disponiveis])
             raise UserNotFoundError("Acesso restrito a perfis específicos")
 
         return cargo_permitido
+
+    def _get_unidade_lotacao(self, eol_data: dict) -> dict:
+        """Retorna a unidade de lotação com base nos dados recebidos."""
+
+        unidade_lotacao = eol_data.get('unidadeExercicio') or eol_data.get('unidadesLotacao', [])
+        if isinstance(unidade_lotacao, list):
+            return unidade_lotacao[0] if unidade_lotacao else {}
+        return unidade_lotacao
 
     def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
         """
@@ -115,7 +126,7 @@ class LoginView(TokenObtainPairView):
 
         return None
 
-    def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+    def create_or_update_user_with_cargo(self, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """
         Cria ou atualiza um cargo e um usuário associado a ele, garantindo que ambas operações 
         ocorram juntas de forma segura.
@@ -125,9 +136,9 @@ class LoginView(TokenObtainPairView):
             with transaction.atomic():
                 # Criação/atualização do cargo
                 cargo, _ = Cargo.objects.update_or_create(
-                    codigo=cargo_data['codigo'],
+                    codigo=cargo_autorizado['codigo'],
                     defaults={
-                        'nome': cargo_data['nome']
+                        'nome': cargo_autorizado['nome']
                     }
                 )
 
@@ -168,10 +179,11 @@ class LoginView(TokenObtainPairView):
             'refresh': str(refresh),
         }
     
-    def _build_user_response(self, senha: str, auth_data: dict, cargo_data: dict) -> dict:
+    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict, unidade_lotacao: dict) -> dict:
         """Monta resposta com dados do usuário"""
             
-        _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+        _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_autorizado)
+
         # Gera tokens JWT
         tokens = self._generate_token(_user)
         return {
@@ -180,9 +192,10 @@ class LoginView(TokenObtainPairView):
             "cpf": auth_data.get('cpf', ''),
             "login": auth_data.get('login', ''),
             "visoes": auth_data.get('visoes', []),
-            "cargo": {
+            "perfil_acesso": {
                 "codigo": _user.cargo.codigo,
                 "nome": _user.cargo.nome
             },
+            "unidade_lotacao": unidade_lotacao,
             "token": tokens['access']
         }
