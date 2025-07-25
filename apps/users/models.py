@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
 
 
 class User(AbstractUser):
@@ -16,6 +17,17 @@ class User(AbstractUser):
         on_delete=models.PROTECT,
         default=3085,
         help_text="Cargo do usuário no sistema"
+    )
+    unidades = models.ManyToManyField(
+        Unidade,
+        related_name="usuarios",
+        blank=True,
+        help_text="Unidades associadas ao usuário"
+    )
+    rede = models.CharField(
+        max_length=10,
+        choices=TipoGestaoChoices.choices,
+        default=TipoGestaoChoices.DIRETA
     )
                               
     class Meta:
