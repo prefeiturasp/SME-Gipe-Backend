@@ -8,7 +8,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from apps.users.models import User
 
-from .serializers import UserSerializer
+from apps.users.api.serializers.validate_view import UserSerializer
 
 
 class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
