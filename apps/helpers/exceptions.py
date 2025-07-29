@@ -8,4 +8,10 @@ class CargoNotFoundError(Exception):
 
 class UserNotFoundError(Exception):
     """Erro quando usuário não é encontrado"""
+    def __init__(self, message, usuario=None):
+        super().__init__(message)
+        self.usuario = usuario
+
+class InternalError(Exception):
+    """Erro interno do sistema"""
     pass
