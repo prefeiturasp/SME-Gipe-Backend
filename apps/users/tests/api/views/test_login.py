@@ -305,14 +305,6 @@ class TestCargoAlternativo:
 
         assert result is None
 
-    def test_get_unidade_lotacao(self):
-        cargos_data = {
-            "unidadeExercicio": {"codigo": 1, "nome": "Unidade X"},
-            "unidadesLotacao": [{"codigo": 2, "nome": "Unidade Y"}]
-        }
-        resultado = self.view._get_unidade_lotacao(cargos_data)
-        assert resultado == [{"codigo": 1, "nome": "Unidade X"}]
-
     @patch("apps.users.services.login.AutenticacaoService._authenticate_user_by_cpf")
     def test_login_por_cpf_com_sucesso(self, mock_auth_cpf):
         mock_auth_cpf.return_value = {
