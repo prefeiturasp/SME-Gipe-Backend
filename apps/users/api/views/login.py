@@ -57,8 +57,7 @@ class LoginView(TokenObtainPairView):
                 usuario_name = auth_data['nome'].split(' ')[0]
                 eol_data = self._get_user_cargo(login, usuario_name)
                 cargo_autorizado = self._valida_cargo_permitido(login, eol_data, usuario_name)
-                unidade_lotacao = self._get_unidade_lotacao(eol_data)
-                user_data = self._build_user_response(senha, auth_data, cargo_autorizado, unidade_lotacao)
+                user_data = self._build_user_response(senha, auth_data, cargo_autorizado)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -112,14 +111,6 @@ class LoginView(TokenObtainPairView):
             raise UserNotFoundError("Acesso restrito a perfis específicos", usuario=usuario_name)
 
         return cargo_permitido
-
-    def _get_unidade_lotacao(self, eol_data: dict) -> list:
-        """Retorna a unidade de lotação como lista, independentemente da estrutura recebida."""
-
-        unidade = eol_data.get('unidadeExercicio') or eol_data.get('unidadesLotacao', [])
-        if isinstance(unidade, list):
-            return unidade
-        return [unidade]
 
     def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
         """
@@ -193,7 +184,7 @@ class LoginView(TokenObtainPairView):
             'refresh': str(refresh),
         }
     
-    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict, unidade_lotacao: dict) -> dict:
+    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """Monta resposta com dados do usuário"""
             
         _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_autorizado)
@@ -210,6 +201,9 @@ class LoginView(TokenObtainPairView):
                 "codigo": _user.cargo.codigo,
                 "nome": _user.cargo.nome
             },
-            "unidade_lotacao": unidade_lotacao,
+            "unidade_lotacao": [
+                    {"codigo": u["codigo_eol"], "nomeUnidade": u["nome"]}
+                    for u in _user.unidades.all().values("codigo_eol", "nome")
+                ] if _user.unidades.exists() else [],
             "token": tokens['access']
         }
