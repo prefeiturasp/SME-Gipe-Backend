@@ -19,7 +19,7 @@ class TestCargosService:
         }
         mock_get.return_value = mock_response
 
-        resultado = CargosService.get_cargos("123456")
+        resultado = CargosService.get_cargos("123456", "João")
 
         assert "cargos" in resultado
         assert resultado["cargos"][0]["codigo"] == 1001
@@ -33,7 +33,7 @@ class TestCargosService:
         mock_get.return_value = mock_response
 
         with pytest.raises(UserNotFoundError, match="Usuário não encontrado no sistema EOL"):
-            CargosService.get_cargos("123456")
+            CargosService.get_cargos("123456", "João")
 
     @patch("apps.users.services.cargos.env")
     @patch("apps.users.services.cargos.requests.get")
@@ -44,7 +44,7 @@ class TestCargosService:
         mock_get.return_value = mock_response
 
         with pytest.raises(Exception, match="Erro na consulta de cargos: 500"):
-            CargosService.get_cargos("123456")
+            CargosService.get_cargos("123456", "João")
 
     @patch("apps.users.services.cargos.env")
     @patch("apps.users.services.cargos.requests.get", side_effect=Exception("Erro inesperado"))
@@ -52,7 +52,7 @@ class TestCargosService:
         mock_env.return_value = "http://fake-api"
 
         with pytest.raises(Exception, match="Erro inesperado"):
-            CargosService.get_cargos("123456")
+            CargosService.get_cargos("123456", "João")
 
     @patch("apps.users.services.cargos.env")
     @patch("apps.users.services.cargos.requests.get", side_effect=requests.exceptions.RequestException("Timeout"))
@@ -60,7 +60,7 @@ class TestCargosService:
         mock_env.return_value = "http://fake-api"
 
         with pytest.raises(Exception, match="Erro de comunicação com sistema de cargos: Timeout"):
-            CargosService.get_cargos("123456")
+            CargosService.get_cargos("123456", "João")
 
     def test_get_cargo_permitido_com_cargo_valido(self):
         dados = {

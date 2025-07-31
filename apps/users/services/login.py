@@ -1,7 +1,12 @@
 import logging
 import environ
 import requests
-from apps.helpers.exceptions import AuthenticationError
+from datetime import datetime
+
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.users.models import User
+from apps.helpers.exceptions import AuthenticationError, InternalError, UserNotFoundError
 
 env = environ.Env()
 logger = logging.getLogger(__name__)
@@ -65,3 +70,58 @@ class AutenticacaoService:
         except Exception as e:
             logger.error("Erro inesperado na autenticação: %s", str(e))
             raise AuthenticationError(f"Erro interno: {str(e)}")
+        
+    @classmethod
+    def _authenticate_user_by_cpf(cls, cpf: str, senha: str) -> dict:
+        """
+        Autentica o usuário utilizando o CPF diretamente do banco de dados.
+        """
+
+        try:
+            usuario = User.objects.get(cpf=cpf)
+
+            if not usuario.check_password(senha):
+                logger.warning("Senha incorreta para o CPF informado: %s", cpf)
+                raise AuthenticationError("Senha inválida.")
+            
+            if usuario.rede != "INDIRETA":
+                logger.warning("Usuário com CPF %s não pertence à rede INDIRETA ou PARCEIRA", cpf)
+                raise UserNotFoundError("Acesso restrito a usuários da rede INDIRETA ou PARCEIRA.", usuario=usuario.name)
+
+            logger.info("Usuário autenticado com sucesso via CPF: %s", cpf)
+
+            usuario.last_login = datetime.now()
+            usuario.save()
+
+            token = RefreshToken.for_user(usuario)
+
+            return {
+                "name": usuario.name,
+                "email": usuario.email,
+                "cpf": usuario.cpf,
+                "login": usuario.username,
+                "visoes": [],
+                "perfil_acesso": {
+                    "codigo": usuario.cargo.codigo,
+                    "nome": usuario.cargo.nome
+                },
+                "unidade_lotacao": [
+                    {"codigo": u["codigo_eol"], "nomeUnidade": u["nome"]}
+                    for u in usuario.unidades.all().values("codigo_eol", "nome")
+                ] if usuario.unidades.exists() else [],
+                "token": str(token.access_token)
+            }
+
+        except User.DoesNotExist:
+            logger.warning("Usuário com CPF %s não encontrado", cpf)
+            raise AuthenticationError("Usuário não encontrado.")
+        
+        except AuthenticationError:
+            raise
+
+        except UserNotFoundError:
+            raise 
+
+        except Exception as e:
+            logger.error("Erro interno na autenticação via CPF: %s", str(e))
+            raise InternalError("Erro interno ao autenticar via CPF.")

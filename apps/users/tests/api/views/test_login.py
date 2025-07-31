@@ -34,7 +34,7 @@ class TestLoginView:
         mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "joaos", "password": "senha123"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha123", "auth_method": "rf"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -50,12 +50,12 @@ class TestLoginView:
         response = LoginView.as_view()(request)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["detail"] == "Login e senha são obrigatórios"
+        assert response.data["detail"] == "Credenciais inválidas"
 
     @patch("apps.users.services.login.AutenticacaoService.autentica", side_effect=AuthenticationError("Credenciais inválidas"))
     def test_login_credenciais_invalidas(self, mock_autentica):
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "usuario", "password": "senha_errada"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha_errada", "auth_method": "rf"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -78,7 +78,7 @@ class TestLoginView:
         mock_get_cargos.return_value = {"cargos": [{"codigo": 40, "nome": "Professor"}]}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "marias", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha", "auth_method": "rf"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -88,7 +88,7 @@ class TestLoginView:
     @patch("apps.users.services.login.AutenticacaoService.autentica", side_effect=Exception("Erro inesperado"))
     def test_erro_interno(self, mock_autentica):
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "usuario", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha", "auth_method": "rf"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -257,7 +257,7 @@ class TestLoginView:
         mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "carlosd", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha", "auth_method": "rf"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -305,19 +305,29 @@ class TestCargoAlternativo:
 
         assert result is None
 
-    def test_get_unidade_lotacao_return_unidadeExercicio():
-        view = LoginView()
-        cargos_data = {
-            "unidadeExercicio": {"codigo": 1, "nome": "Unidade X"},
-            "unidadesLotacao": [{"codigo": 2, "nome": "Unidade Y"}]
+    @patch("apps.users.services.login.AutenticacaoService._authenticate_user_by_cpf")
+    def test_login_por_cpf_com_sucesso(self, mock_auth_cpf):
+        mock_auth_cpf.return_value = {
+            "name": "Joana",
+            "email": "joana@email.com",
+            "cpf": "22233344455",
+            "login": "joanaj",
+            "visoes": [],
+            "perfil_acesso": {"codigo": 1, "nome": "Cargo X"},
+            "unidade_lotacao": [],
+            "token": "token-accesso"
         }
-        resultado = view._get_unidade_lotacao(cargos_data)
-        assert resultado == {"codigo": 1, "nome": "Unidade X"}
 
-    def test_get_unidade_lotacao_return_unidadeExercicio(self):
-        cargos_data = {
-            "unidadeExercicio": {"codigo": 1, "nome": "Unidade X"},
-            "unidadesLotacao": [{"codigo": 2, "nome": "Unidade Y"}]
-        }
-        resultado = self.view._get_unidade_lotacao(cargos_data)
-        assert resultado == {"codigo": 1, "nome": "Unidade X"}
+        factory = APIRequestFactory()
+        request = factory.post("/api/login", {
+            "username": "22233344455",
+            "password": "senha",
+            "auth_method": "cpf"
+        }, format='json')
+
+        response = LoginView.as_view()(request)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["name"] == "Joana"
+        assert response.data["perfil_acesso"]["nome"] == "Cargo X"
+        assert response.data["token"] == "token-accesso"

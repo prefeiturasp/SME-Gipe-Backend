@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import permissions, status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.exceptions import ValidationError
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError, DatabaseError
@@ -11,6 +12,7 @@ from apps.users.models import Cargo
 from apps.users.services.cargos import CargosService
 from apps.users.services.login import AutenticacaoService
 from apps.helpers.exceptions import AuthenticationError, UserNotFoundError
+from apps.users.api.serializers.validate_login import LoginSerializer
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -23,32 +25,39 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         """
         Endpoint para autenticação de usuários
-        
+
         Fluxo:
-        1. Autentica no CoreSSO
-        2. Busca cargos no EOL
-        3. Valida se possui cargo permitido
-        4. Retorna dados do usuário
+        1. Valida entrada com serializer
+        2. Autentica via CoreSSO (RF) ou ORM (CPF)
+        3. Busca cargos
+        4. Retorna dados do usuário + token
         """
 
         logger.info("Iniciando processo de autenticação")
-        
-        # Validação de entrada
-        login = request.data.get("username")
-        senha = request.data.get("password")
-        
-        if not login or not senha:
+
+        serializer = LoginSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError:
             return Response(
-                {'detail': 'Login e senha são obrigatórios'}, 
+                {'detail': 'Credenciais inválidas'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        login = serializer.validated_data["username"]
+        senha = serializer.validated_data["password"]
+        auth_method = serializer.validated_data["auth_method"]
         
         try:
-            auth_data = self._authenticate_user(login, senha)  
-            eol_data = self._get_user_cargo(login)
-            cargo_autorizado = self._valida_cargo_permitido(login, eol_data)
-            unidade_lotacao = self._get_unidade_lotacao(eol_data)
-            user_data = self._build_user_response(senha, auth_data, cargo_autorizado, unidade_lotacao)
+            if auth_method == "cpf":
+                user_data = self._authenticate_user_by_cpf(login, senha)
+
+            else:
+                auth_data = self._authenticate_user(login, senha)  
+                usuario_name = auth_data['nome'].split(' ')[0]
+                eol_data = self._get_user_cargo(login, usuario_name)
+                cargo_autorizado = self._valida_cargo_permitido(login, eol_data, usuario_name)
+                user_data = self._build_user_response(senha, auth_data, cargo_autorizado)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -63,7 +72,7 @@ class LoginView(TokenObtainPairView):
         except UserNotFoundError as e:
             logger.warning("Usuário não encontrado no EOL: %s", login)
             return Response(
-                {'detail': f'Olá {auth_data['nome'].split(' ')[0]}! Desculpe, mas o acesso ao GIPE é restrito a perfis específicos.'}, 
+                {'detail': f'Olá {e.usuario}! Desculpe, mas o acesso ao GIPE é restrito a perfis específicos.'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
             
@@ -78,11 +87,15 @@ class LoginView(TokenObtainPairView):
         """Autentica usuário no CoreSSO"""
         return AutenticacaoService.autentica(login, senha)
     
-    def _get_user_cargo(self, rf: str) -> dict:
+    def _authenticate_user_by_cpf(self, login: str, senha: str) -> dict:
+        """Autentica usuário usando a Base Local"""
+        return AutenticacaoService._authenticate_user_by_cpf(login, senha)
+    
+    def _get_user_cargo(self, rf: str, usuario_name: str) -> dict:
         """Busca e valida cargo do usuário"""
-        return CargosService.get_cargos(rf)
+        return CargosService.get_cargos(rf, usuario_name)
 
-    def _valida_cargo_permitido(self, rf: int, eol_data: dict) -> dict:
+    def _valida_cargo_permitido(self, rf: int, eol_data: dict, usuario_name: str) -> dict:
         """Valida se o usuário possui um cargo autorizado para acesso ao sistema."""
 
         # Busca cargo permitido
@@ -95,17 +108,9 @@ class LoginView(TokenObtainPairView):
             
             cargos_disponiveis = eol_data.get('cargos', [])
             logger.info("Cargo não permitido. Cargos disponíveis: %s", [c.get('codigo') for c in cargos_disponiveis])
-            raise UserNotFoundError("Acesso restrito a perfis específicos")
+            raise UserNotFoundError("Acesso restrito a perfis específicos", usuario=usuario_name)
 
         return cargo_permitido
-
-    def _get_unidade_lotacao(self, eol_data: dict) -> dict:
-        """Retorna a unidade de lotação com base nos dados recebidos."""
-
-        unidade_lotacao = eol_data.get('unidadeExercicio') or eol_data.get('unidadesLotacao', [])
-        if isinstance(unidade_lotacao, list):
-            return unidade_lotacao[0] if unidade_lotacao else {}
-        return unidade_lotacao
 
     def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
         """
@@ -179,7 +184,7 @@ class LoginView(TokenObtainPairView):
             'refresh': str(refresh),
         }
     
-    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict, unidade_lotacao: dict) -> dict:
+    def _build_user_response(self, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """Monta resposta com dados do usuário"""
             
         _user = self.create_or_update_user_with_cargo(senha, auth_data, cargo_autorizado)
@@ -196,6 +201,9 @@ class LoginView(TokenObtainPairView):
                 "codigo": _user.cargo.codigo,
                 "nome": _user.cargo.nome
             },
-            "unidade_lotacao": unidade_lotacao,
+            "unidade_lotacao": [
+                    {"codigo": u["codigo_eol"], "nomeUnidade": u["nome"]}
+                    for u in _user.unidades.all().values("codigo_eol", "nome")
+                ] if _user.unidades.exists() else [],
             "token": tokens['access']
         }

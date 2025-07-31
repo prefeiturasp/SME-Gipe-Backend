@@ -2,7 +2,7 @@ import logging
 import environ
 import requests
 from apps.helpers.enums import Cargo
-from apps.helpers.exceptions import CargoNotFoundError, UserNotFoundError
+from apps.helpers.exceptions import CargoNotFoundError, UserNotFoundError, InternalError
 
 env = environ.Env()
 logger = logging.getLogger(__name__)
@@ -17,19 +17,8 @@ class CargosService:
     DEFAULT_TIMEOUT = 10
     
     @classmethod
-    def get_cargos(cls, rf: str) -> list[dict]:
-        """
-        Busca cargos do usuário no sistema EOL
-        
-        Args:
-            rf: RF (Registro Funcional) do usuário
-            
-        Returns:
-            Lista de cargos do usuário
-            
-        Raises:
-            UserNotFoundError: Quando usuário não é encontrado
-        """
+    def get_cargos(cls, rf: str, usuario_name: str) -> list[dict]:
+        """Busca cargos do usuário no sistema EOL"""
 
         url = f"{env('SME_INTEGRACAO_URL', default='')}/Intranet/CarregarPerfisPorLogin/{rf}"
         
@@ -44,12 +33,12 @@ class CargosService:
             
             if response.status_code == 401:
                 logger.warning("Usuário não encontrado no EOL. RF: %s", rf)
-                raise UserNotFoundError("Usuário não encontrado no sistema EOL")
+                raise UserNotFoundError("Usuário não encontrado no sistema EOL", usuario=usuario_name)
             
             if response.status_code != 200:
                 logger.error("Erro ao buscar cargos no EOL. Status: %s, RF: %s", 
                            response.status_code, rf)
-                raise Exception(f"Erro na consulta de cargos: {response.status_code}")
+                raise CargoNotFoundError(f"Erro na consulta de cargos: {response.status_code}")
             
             cargos_data = response.json()
             logger.info("Cargos encontrados para RF %s: %s", rf, len(cargos_data.get('cargos', [])))
@@ -58,7 +47,8 @@ class CargosService:
             
         except requests.exceptions.RequestException as e:
             logger.error("Erro de comunicação com EOL: %s", str(e))
-            raise Exception(f"Erro de comunicação com sistema de cargos: {str(e)}")
+            raise InternalError(f"Erro de comunicação com sistema de cargos: {str(e)}")
+        
         except UserNotFoundError:
             raise  # Re-raise para manter a exceção específica
         except Exception as e:
