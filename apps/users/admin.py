@@ -4,8 +4,9 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm
- 
+
 from .models import User, Cargo
+from apps.unidades.models.unidades import TipoGestaoChoices
 
 User = get_user_model()
 
@@ -20,7 +21,8 @@ class CustomAdminPasswordChangeForm(AdminPasswordChangeForm):
         # Remove o campo 'usable_password' se existir
         if 'usable_password' in self.fields:
             del self.fields['usable_password']
-    
+
+
 class CustomUserCreationForm(UserCreationForm):
     """
     Formulário personalizado para criação de usuários no admin
@@ -29,10 +31,11 @@ class CustomUserCreationForm(UserCreationForm):
     name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
+    rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + ('name', 'cpf', 'cargo')
+        fields = UserCreationForm.Meta.fields + ('name', 'cpf', 'cargo', 'rede', 'unidades')
 
     def clean_cpf(self):
         """Valida o CPF (apenas números)"""
@@ -40,7 +43,8 @@ class CustomUserCreationForm(UserCreationForm):
         if cpf and not cpf.isdigit():
             raise ValidationError('CPF deve conter apenas números')
         return cpf
-    
+
+
 class CustomUserChangeForm(UserChangeForm):
     """
     Formulário personalizado para alteração de usuários no admin
@@ -49,10 +53,11 @@ class CustomUserChangeForm(UserChangeForm):
     name = forms.CharField(label="Nome", max_length=150, required=True)
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
+    rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
 
     class Meta(UserChangeForm.Meta):
         model = User
-        fields = UserChangeForm.Meta.fields
+        fields = '__all__'
 
     def clean_cpf(self):
         """Valida o CPF (apenas números)"""
@@ -60,13 +65,14 @@ class CustomUserChangeForm(UserChangeForm):
         if cpf and not cpf.isdigit():
             raise ValidationError('CPF deve conter apenas números')
         return cpf
- 
+
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """
     Configuração do admin para o modelo User customizado
     """
+
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
@@ -77,14 +83,14 @@ class UserAdmin(BaseUserAdmin):
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {
-            'fields': ('name', 'cpf', 'cargo', 'uuid')
+            'fields': ('name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades')
         }),
     )
     # Configuração dos fieldsets para criação
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'name', 'cpf', 'cargo', 'password1', 'password2'),
+            'fields': ('username', 'name', 'cpf', 'cargo', 'rede', 'unidades', 'password1', 'password2'),
         }),
         ('Permissões', {
             'classes': ('wide',),
@@ -93,6 +99,8 @@ class UserAdmin(BaseUserAdmin):
     )
     # Campos somente leitura
     readonly_fields = ('uuid', 'date_joined', 'last_login')
+    autocomplete_fields = ('unidades',)
+
     def get_readonly_fields(self, request, obj=None):
         """
         Define campos somente leitura baseado no contexto
@@ -103,11 +111,13 @@ class UserAdmin(BaseUserAdmin):
             readonly_fields.append('is_superuser')
         return readonly_fields
 
+
 @admin.register(Cargo)
 class CargoAdmin(admin.ModelAdmin):
     """
     Configuração do admin para o modelo Cargo
     """
+
     list_display = ('codigo', 'nome')
     search_fields = ('codigo', 'nome')
     ordering = ('codigo',)

@@ -12,10 +12,10 @@
 Primeiro, clone o projeto:
 
 ### 🔄 via HTTPS
-    $ git clone https://github.com/ollyvergithub/Django-DRF-Setup-Inicial.git
+    $ git clone https://github.com/prefeiturasp/SME-Gipe-Backend.git
 
 ### 🔐 via SSH
-    $ git@github.com:ollyvergithub/Django-DRF-Setup-Inicial.git
+    $ git@github.com:prefeiturasp/SME-Gipe-Backend.git
 
 ### 🐍 Criando e ativando uma virtual env
     $ python -m venv venv

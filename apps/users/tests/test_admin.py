@@ -13,6 +13,8 @@ from apps.users.admin import (
     UserAdmin,
 )
 
+from apps.unidades.models.unidades import TipoGestaoChoices
+
 
 @pytest.mark.django_db
 class TestUserAdmin:
@@ -38,6 +40,8 @@ class TestUserAdmin:
                 "name": "Usuário Teste",
                 "cpf": "12345678900",
                 "cargo": cargo.pk,
+                "rede": TipoGestaoChoices.DIRETA.value,
+                "unidades": [],
                 "password1": "My_R@ndom-P@ssw0rd1",
                 "password2": "My_R@ndom-P@ssw0rd1",
                 "is_active": True,
@@ -90,6 +94,8 @@ class TestCustomUserCreationForm:
             "name": "Valido",
             "cpf": "12345678901",
             "cargo": cargo.pk,
+            "rede": TipoGestaoChoices.DIRETA.value,
+            "unidades": [],
             "password1": "Test1234@",
             "password2": "Test1234@",
         })
@@ -104,6 +110,8 @@ class TestCustomUserCreationForm:
             "name": "Teste",
             "cpf": "ABC1234567",
             "cargo": cargo.pk,
+            "rede": TipoGestaoChoices.DIRETA.value,
+            "unidades": [],
             "password1": "Test1234@",
             "password2": "Test1234@",
         })
@@ -124,18 +132,21 @@ class TestCustomUserChangeForm:
             cpf="98765432100",
             cargo=cargo,
             email="valido@example.com",
+            rede="DIRETA",
             password="Test1234@"
         )
 
         form = CustomUserChangeForm(
             data={
                 "username": user.username,
-                "nome": user.name,
                 "name": user.name,
                 "cpf": user.cpf,
                 "cargo": cargo.pk,
                 "email": user.email,
+                "rede": "DIRETA",
+                "unidades": [],
                 "date_joined": user.date_joined,
+                "last_login": user.last_login,
             },
             instance=user
         )
@@ -144,17 +155,34 @@ class TestCustomUserChangeForm:
 
     def test_invalid_cpf(self):
         cargo = Cargo.objects.create(codigo=3, nome="DevOps")
+        user = User.objects.create_user(
+            username="teste",
+            name="Teste",
+            cpf="12345678900",
+            cargo=cargo,
+            rede="INDIRETA",
+            password="Test1234@"
+        )
 
-        form = CustomUserChangeForm(data={
-            "username": "teste",
-            "name": "Teste",
-            "cpf": "A1B2C3",
-            "cargo": cargo.pk,
-        })
+        form = CustomUserChangeForm(
+            data={
+                "username": user.username,
+                "name": user.name,
+                "cpf": "A1B2C3",
+                "cargo": cargo.pk,
+                "email": "teste@example.com",
+                "rede": "INDIRETA",
+                "unidades": [],
+                "date_joined": user.date_joined,
+                "last_login": user.last_login,
+            },
+            instance=user
+        )
 
         assert not form.is_valid()
         assert 'cpf' in form.errors
         assert form.errors['cpf'] == ['CPF deve conter apenas números']
+
 
 
 @pytest.mark.django_db
