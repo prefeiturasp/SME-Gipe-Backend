@@ -1,7 +1,7 @@
 import logging
 import environ
 import requests
-from datetime import datetime
+from django.utils import timezone
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -90,7 +90,7 @@ class AutenticacaoService:
 
             logger.info("Usuário autenticado com sucesso via CPF: %s", cpf)
 
-            usuario.last_login = datetime.now()
+            usuario.last_login = timezone.now()
             usuario.save()
 
             token = RefreshToken.for_user(usuario)
