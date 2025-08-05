@@ -21,6 +21,7 @@ urlpatterns = [
 
     # User management
     path("api/users/", include("apps.users.urls", namespace="users")),
+    path("api/unidades/", include("apps.unidades.urls", namespace="unidades")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     # ...
