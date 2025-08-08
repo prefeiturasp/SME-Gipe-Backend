@@ -1,9 +1,12 @@
 import pytest
+from unittest.mock import patch
+
 from django.core import mail
 from django.core.exceptions import ValidationError
+
 from rest_framework.test import APIClient
-from unittest.mock import patch
-from apps.users.services.send_email import send_email_service
+
+from apps.users.services.envia_email_service import EnviaEmailService
 
 
 @pytest.fixture(autouse=True)
@@ -13,7 +16,7 @@ def use_locmem_email_backend(settings):
 
 
 @pytest.mark.django_db
-class TestSendEmailService:
+class TestEnviaEmailService:
     @pytest.fixture
     def api_client(self):
         return APIClient()
@@ -22,7 +25,7 @@ class TestSendEmailService:
     def email_data(self):
         return {
             "destinatario": "test@example.com",
-            "assunto": "Teste de envio 03",
+            "assunto": "Teste de envio",
             "template_html": "emails/exemplo.html",
             "contexto": {"nome": "Usuário Teste"},
         }
@@ -31,7 +34,7 @@ class TestSendEmailService:
         # Limpa a outbox antes
         mail.outbox = []
 
-        send_email_service(**email_data)
+        EnviaEmailService.enviar(**email_data)
 
         # Verifica que 1 email foi "enviado"
         assert len(mail.outbox) == 1
@@ -43,15 +46,15 @@ class TestSendEmailService:
     def test_send_email_empty_destinatario_raises(self, email_data):
         email_data['destinatario'] = ''
         with pytest.raises(ValidationError):
-            send_email_service(**email_data)
+            EnviaEmailService.enviar(**email_data)
 
     def test_send_email_empty_assunto_raises(self, email_data):
         email_data['assunto'] = ''
         with pytest.raises(ValidationError):
-            send_email_service(**email_data)
+            EnviaEmailService.enviar(**email_data)
 
     def test_send_email_unexpected_exception_raises_runtimeerror(self, email_data):
         # Patch no método email.send para lançar uma exceção genérica
         with patch('django.core.mail.EmailMessage.send', side_effect=Exception("Erro inesperado")):
             with pytest.raises(RuntimeError, match="Erro inesperado ao enviar e-mail."):
-                send_email_service(**email_data)
+                EnviaEmailService.enviar(**email_data)
