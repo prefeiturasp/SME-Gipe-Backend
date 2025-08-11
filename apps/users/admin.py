@@ -32,10 +32,13 @@ class CustomUserCreationForm(UserCreationForm):
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
     rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
+    is_validado = forms.BooleanField(label="Usuário validado", required=False)
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + ('name', 'cpf', 'cargo', 'rede', 'unidades')
+        fields = UserCreationForm.Meta.fields + (
+            'name', 'cpf', 'cargo', 'rede', 'unidades', 'is_validado'
+        )
 
     def clean_cpf(self):
         """Valida o CPF (apenas números)"""
@@ -54,6 +57,7 @@ class CustomUserChangeForm(UserChangeForm):
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
     rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
+    is_validado = forms.BooleanField(label="Usuário validado", required=False)
 
     class Meta(UserChangeForm.Meta):
         model = User
@@ -83,14 +87,14 @@ class UserAdmin(BaseUserAdmin):
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {
-            'fields': ('name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades')
+            'fields': ('name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades', 'is_validado')
         }),
     )
     # Configuração dos fieldsets para criação
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'name', 'cpf', 'cargo', 'rede', 'unidades', 'password1', 'password2'),
+            'fields': ('username', 'name', 'cpf', 'cargo', 'rede', 'unidades', 'is_validado', 'password1', 'password2'),
         }),
         ('Permissões', {
             'classes': ('wide',),
