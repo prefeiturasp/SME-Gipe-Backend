@@ -32,7 +32,7 @@ class CustomUserCreationForm(UserCreationForm):
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
     rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
-    is_validado = forms.BooleanField(label="Usuário validado", required=True)
+    is_validado = forms.BooleanField(label="Usuário validado", required=False)
 
     class Meta(UserCreationForm.Meta):
         model = User
@@ -57,7 +57,7 @@ class CustomUserChangeForm(UserChangeForm):
     cpf = forms.CharField(max_length=11, required=True)
     cargo = forms.ModelChoiceField(label="Perfil de acesso", queryset=Cargo.objects.all(), required=True)
     rede = forms.ChoiceField(choices=TipoGestaoChoices.choices, required=True, label="Rede")
-    is_validado = forms.BooleanField(label="Usuário validado", required=True)
+    is_validado = forms.BooleanField(label="Usuário validado", required=False)
 
     class Meta(UserChangeForm.Meta):
         model = User
