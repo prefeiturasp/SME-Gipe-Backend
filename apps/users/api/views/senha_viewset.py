@@ -1,4 +1,6 @@
+import environ
 import logging
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.views import APIView
@@ -9,9 +11,12 @@ from apps.users.api.serializers.senha_serializer import EsqueciMinhaSenhaSeriali
 from apps.helpers.exceptions import EmailNaoCadastrado, SmeIntegracaoException
 from apps.users.services.senha_service import SenhaService
 from apps.users.services.sme_integracao_service import SmeIntegracaoService
+from apps.users.services.envia_email_service import EnviaEmailService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+env = environ.Env()
+
 
 
 class EsqueciMinhaSenhaViewSet(APIView):
@@ -22,7 +27,6 @@ class EsqueciMinhaSenhaViewSet(APIView):
         serializer.is_valid(raise_exception=True)
 
         username = serializer.validated_data["username"]
-
         try:
             result = SmeIntegracaoService.informacao_usuario_sgp(username)
             email = result.get("email")
@@ -35,8 +39,22 @@ class EsqueciMinhaSenhaViewSet(APIView):
 
             result = SenhaService.gerar_token_para_reset(username, email)
 
-            # TODO: Enviar e-mail aqui
-            return Response(result, status=status.HTTP_200_OK)
+            link_reset = f"{env('FRONTEND_URL')}/reset-senha/{result['uid']}/{result['token']}"
+            contexto_email = {
+                "nome_usuario": result.get('name'),
+                "link_reset": link_reset,
+                "backend_url": env('BACKEND_URL')
+            }
+
+            EnviaEmailService.enviar(
+                destinatario=email,
+                assunto="Redefinição de senha",
+                template_html="emails/reset_senha.html",
+                contexto=contexto_email,
+            )
+
+            return Response("Email enviado com sucesso", status=status.HTTP_200_OK)
+
 
         except EmailNaoCadastrado as e:
             return Response(
