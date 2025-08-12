@@ -11,19 +11,25 @@ User = get_user_model()
 class TestEsqueciMinhaSenhaViewSet:
     @patch('apps.users.services.sme_integracao_service.SmeIntegracaoService.informacao_usuario_sgp')
     @patch('apps.users.services.senha_service.SenhaService.gerar_token_para_reset')
-    def test_fluxo_feliz(self, mock_senha, mock_sme):
+    @patch('apps.users.services.envia_email_service.EnviaEmailService.enviar')
+    def test_fluxo_feliz(self, mock_enviar, mock_senha, mock_sme):
         """Testa o caso de sucesso (tudo funciona)"""
         mock_sme.return_value = {'email': 'teste@escola.com'}
-        mock_senha.return_value = {'status': 'ok', 'token': '123'}
+        mock_senha.return_value = {
+            'token': 'tokenxyz',
+            'uid': 'abc123',
+            'name': 'Fulano'
+        }
+        mock_enviar.return_value = None
 
-        User.objects.create(username='1234567')
+        User.objects.create(username='1234567', name='Fulano da Silva')
 
         view = EsqueciMinhaSenhaViewSet()
         request = MagicMock(data={'username': '1234567'})
         response = view.post(request)
 
         assert response.status_code == 200
-        assert response.data['status'] == 'ok'
+        assert response.data == 'Email enviado com sucesso'
 
     @patch('apps.users.services.sme_integracao_service.SmeIntegracaoService.informacao_usuario_sgp')
     def test_email_nao_cadastrado(self, mock_sme):

@@ -17,11 +17,14 @@ class TestSenhaService:
         assert isinstance(token, str)
 
     def test_gerar_token_para_reset_success(self):
-        user = User.objects.create(username='1234567', email='test@example.com')
-        
+        user = User.objects.create(
+                    username='1234567', 
+                    email='test@example.com',
+                    name='Test User'
+                )        
         result = SenhaService.gerar_token_para_reset('1234567', 'test@example.com')
         
-        assert result['status'] == 'ok'
         assert 'token' in result
         assert 'uid' in result
-        assert result['email'] == 'test@example.com'
+        assert 'name' in result
+        assert result['name'] == 'Test' 
