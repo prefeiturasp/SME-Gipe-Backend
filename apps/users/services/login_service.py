@@ -84,7 +84,7 @@ class AutenticacaoService:
                 logger.warning("Senha incorreta para o CPF informado: %s", cpf)
                 raise AuthenticationError("Senha inválida.")
             
-            if usuario.rede != "INDIRETA":
+            if usuario.rede != "INDIRETA" or not usuario.is_validado:
                 logger.warning("Usuário com CPF %s não pertence à rede INDIRETA ou PARCEIRA", cpf)
                 raise UserNotFoundError("Acesso restrito a usuários da rede INDIRETA ou PARCEIRA.", usuario=usuario.name)
 
