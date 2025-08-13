@@ -34,12 +34,12 @@ class SenhaService:
 
         uid, token = SenhaService.gerar_token_para_usuario(user)
 
+        name = user.name.split(" ")[0]
+
         resultado = {
-            "status": "ok",
             "token": token,
             "uid": uid,
-            "email": email,
-            "message": "Link de redefinição enviado com sucesso."
+            "name": name,
         }
 
         logger.info(f"Token de reset gerado com sucesso para {username}")

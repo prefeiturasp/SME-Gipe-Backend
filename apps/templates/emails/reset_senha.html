@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redefinição de Senha - GIPE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Roboto', Arial, sans-serif; background-color: #f5f5f5;">
+    <div style="max-width: 645px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <!-- Cabeçalho -->
+        <div style="background-color: #e5e8ff; padding: 25px 20px; text-align: center;">
+            <img src="{{backend_url}}/django_static/images/logo_GIPE.png" alt="GIPE" style="max-width: 220px; height: auto;">
+        </div>
+        
+        <!-- Corpo do e-mail -->
+        <div style="padding: 30px; color: #42474A; line-height: 1.375;">
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Olá <span style="font-weight: 700;">{{ nome_usuario }}</span>!
+            </p>
+            
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Recebemos uma solicitação para redefinir a senha da sua conta no GIPE. Para continuar, 
+                <a href="{{ link_reset }}" style="color: #42474A; font-weight: 700; text-decoration: none;">CLIQUE AQUI</a>!<br>
+                Este link expira em <span style="font-weight: 700;">5 minutos</span>. Se você não solicitou essa alteração, ignore este e-mail!
+            </p>
+            
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 700;">
+                Dúvidas ou problemas?
+            </p>
+            
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Se o link acima não funcionar, copie o endereço abaixo e cole no seu navegador:<br>
+                <span style="word-break: break-all;">{{link_reset}}</span>
+            </p>
+            
+            <p style="margin: 0; font-size: 14px; font-weight: 400;">
+                Atenciosamente,<br>
+                Equipe GIPE.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
