@@ -79,4 +79,4 @@ class UnidadeViewSet(GenericViewSet):
         return Response(serializer.data)
 
     def _resposta_erro(self, mensagem, status_code):
-        return Response({"erro": mensagem}, status=status_code)
+        return Response({"detail": mensagem}, status=status_code)

@@ -66,14 +66,14 @@ class TestUnidadeViewSet:
     def test_listar_ues_sem_dre(self, api_client):
         response = api_client.get("/api/unidades/?tipo=UE")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "erro" in response.data
+        assert "detail" in response.data
 
     def test_listar_ues_com_uuid_invalido(self, api_client):
         response = api_client.get("/api/unidades/?tipo=UE&dre=uuid-invalido")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "erro" in response.data
+        assert "detail" in response.data
 
     def test_listar_com_tipo_invalido(self, api_client):
         response = api_client.get("/api/unidades/?tipo=INVALIDO")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "erro" in response.data
+        assert "detail" in response.data
