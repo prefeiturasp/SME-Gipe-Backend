@@ -2,14 +2,14 @@ import pytest
 import requests
 from unittest.mock import patch, MagicMock
 from apps.helpers.exceptions import UserNotFoundError
-from apps.users.services.cargos import CargosService
+from apps.users.services.cargos_service import CargosService
 from apps.helpers.enums import Cargo
 
 
 class TestCargosService:
 
-    @patch("apps.users.services.cargos.env")
-    @patch("apps.users.services.cargos.requests.get")
+    @patch("apps.users.services.cargos_service.env")
+    @patch("apps.users.services.cargos_service.requests.get")
     def test_get_cargos_sucesso(self, mock_get, mock_env):
         mock_env.return_value = "http://fake-api"
         mock_response = MagicMock()
@@ -24,8 +24,8 @@ class TestCargosService:
         assert "cargos" in resultado
         assert resultado["cargos"][0]["codigo"] == 1001
 
-    @patch("apps.users.services.cargos.env")
-    @patch("apps.users.services.cargos.requests.get")
+    @patch("apps.users.services.login_service.env")
+    @patch("apps.users.services.login_service.requests.get")
     def test_get_cargos_usuario_nao_encontrado(self, mock_get, mock_env):
         mock_env.return_value = "http://fake-api"
         mock_response = MagicMock()
@@ -35,8 +35,8 @@ class TestCargosService:
         with pytest.raises(UserNotFoundError, match="Usuário não encontrado no sistema EOL"):
             CargosService.get_cargos("123456", "João")
 
-    @patch("apps.users.services.cargos.env")
-    @patch("apps.users.services.cargos.requests.get")
+    @patch("apps.users.services.cargos_service.env")
+    @patch("apps.users.services.cargos_service.requests.get")
     def test_get_cargos_erro_http(self, mock_get, mock_env):
         mock_env.return_value = "http://fake-api"
         mock_response = MagicMock()
@@ -46,16 +46,16 @@ class TestCargosService:
         with pytest.raises(Exception, match="Erro na consulta de cargos: 500"):
             CargosService.get_cargos("123456", "João")
 
-    @patch("apps.users.services.cargos.env")
-    @patch("apps.users.services.cargos.requests.get", side_effect=Exception("Erro inesperado"))
+    @patch("apps.users.services.cargos_service.env")
+    @patch("apps.users.services.cargos_service.requests.get", side_effect=Exception("Erro inesperado"))
     def test_get_cargos_erro_inesperado(self, mock_get, mock_env):
         mock_env.return_value = "http://fake-api"
 
         with pytest.raises(Exception, match="Erro inesperado"):
             CargosService.get_cargos("123456", "João")
 
-    @patch("apps.users.services.cargos.env")
-    @patch("apps.users.services.cargos.requests.get", side_effect=requests.exceptions.RequestException("Timeout"))
+    @patch("apps.users.services.cargos_service.env")
+    @patch("apps.users.services.cargos_service.requests.get", side_effect=requests.exceptions.RequestException("Timeout"))
     def test_get_cargos_request_exception(self, mock_get, mock_env):
         mock_env.return_value = "http://fake-api"
 
