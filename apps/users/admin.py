@@ -81,9 +81,14 @@ class UserAdmin(BaseUserAdmin):
     add_form = CustomUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
     # Campos exibidos na lista de usuários
-    list_display = ('username', 'name', 'email', 'cargo')
+    list_display = ('username', 'name', 'email', 'cargo', 'rede', 'is_validado')
+    list_editable = ('is_validado',)
+
     search_fields = ('username', 'name', 'email', 'cpf')
     ordering = ('username',)
+
+    list_filter = ('rede', 'is_validado') + BaseUserAdmin.list_filter
+
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {

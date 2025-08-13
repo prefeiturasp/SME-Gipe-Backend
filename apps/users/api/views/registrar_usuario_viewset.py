@@ -29,7 +29,7 @@ class UserCreateView(APIView):
             if not serializer.is_valid():
                 logger.warning(f"Erro de validação: {serializer.errors}")
                 return Response(
-                    {"mensagem": "Erro de validação nos dados enviados.", "erros": serializer.errors},
+                    {"detail": "Erro de validação nos dados enviados.", "erros": serializer.errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -42,7 +42,7 @@ class UserCreateView(APIView):
         except Exception as e:
             logger.exception("Erro inesperado ao criar usuário")
             return Response(
-                {"mensagem": "Erro interno ao criar usuário.", "detalhes": str(e)},
+                {"detail": "Erro interno ao criar usuário.", "detalhes": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

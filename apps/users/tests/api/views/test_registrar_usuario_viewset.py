@@ -79,4 +79,4 @@ class TestUserCreateView:
             response = client.post(self.endpoint, data=valid_payload, format="json")
 
             assert response.status_code == 500
-            assert response.data["mensagem"] == "Erro interno ao criar usuário."
+            assert response.data["detail"] == "Erro interno ao criar usuário."

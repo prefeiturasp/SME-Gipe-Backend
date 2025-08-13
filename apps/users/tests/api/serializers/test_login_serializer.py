@@ -1,6 +1,6 @@
 import pytest
 from rest_framework.exceptions import ValidationError
-from apps.users.api.serializers.validate_login import LoginSerializer
+from apps.users.api.serializers.login_serializer import LoginSerializer
 
 
 @pytest.mark.parametrize("username,expected_digits,auth_method", [
