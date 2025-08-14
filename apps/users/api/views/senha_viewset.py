@@ -39,11 +39,11 @@ class EsqueciMinhaSenhaViewSet(APIView):
 
             result = SenhaService.gerar_token_para_reset(username, email)
 
-            link_reset = f"{env('FRONTEND_URL')}/reset-senha/{result['uid']}/{result['token']}"
+            link_reset = f"{env('FRONTEND_URL')}/recuperar-senha/{result['uid']}/{result['token']}"
             contexto_email = {
                 "nome_usuario": result.get('name'),
                 "link_reset": link_reset,
-                "backend_url": env('BACKEND_URL')
+                "aplicacao_url": env('FRONTEND_URL')
             }
 
             EnviaEmailService.enviar(
