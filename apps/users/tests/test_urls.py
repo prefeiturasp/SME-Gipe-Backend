@@ -25,3 +25,8 @@ def test_redirect():
 def test_login():
     assert reverse("users:login") == "/api/users/login"
     assert resolve("/api/users/login").view_name == "users:login"
+
+
+def test_password_reset():
+    assert reverse("users:esqueci-senha") == "/api/users/esqueci-senha"
+    assert resolve("/api/users/esqueci-senha").view_name == "users:esqueci-senha"

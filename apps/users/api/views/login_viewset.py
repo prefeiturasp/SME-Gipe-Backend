@@ -9,10 +9,10 @@ from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError, DatabaseError
 
 from apps.users.models import Cargo
-from apps.users.services.cargos import CargosService
-from apps.users.services.login import AutenticacaoService
+from apps.users.services.cargos_service import CargosService
+from apps.users.services.login_service import AutenticacaoService
 from apps.helpers.exceptions import AuthenticationError, UserNotFoundError
-from apps.users.api.serializers.validate_login import LoginSerializer
+from apps.users.api.serializers.login_serializer import LoginSerializer
 
 User = get_user_model()
 logger = logging.getLogger(__name__)

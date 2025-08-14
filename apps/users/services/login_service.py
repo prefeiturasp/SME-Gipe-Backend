@@ -1,7 +1,7 @@
 import logging
 import environ
 import requests
-from datetime import datetime
+from django.utils import timezone
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -84,13 +84,13 @@ class AutenticacaoService:
                 logger.warning("Senha incorreta para o CPF informado: %s", cpf)
                 raise AuthenticationError("Senha inválida.")
             
-            if usuario.rede != "INDIRETA":
+            if usuario.rede != "INDIRETA" or not usuario.is_validado:
                 logger.warning("Usuário com CPF %s não pertence à rede INDIRETA ou PARCEIRA", cpf)
                 raise UserNotFoundError("Acesso restrito a usuários da rede INDIRETA ou PARCEIRA.", usuario=usuario.name)
 
             logger.info("Usuário autenticado com sucesso via CPF: %s", cpf)
 
-            usuario.last_login = datetime.now()
+            usuario.last_login = timezone.now()
             usuario.save()
 
             token = RefreshToken.for_user(usuario)

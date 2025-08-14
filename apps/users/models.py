@@ -29,6 +29,7 @@ class User(AbstractUser):
         choices=TipoGestaoChoices.choices,
         default=TipoGestaoChoices.DIRETA
     )
+    is_validado = models.BooleanField("Validado", default=False, help_text="Indica se o usuário foi validado")
                               
     class Meta:
         verbose_name = "Usuário"

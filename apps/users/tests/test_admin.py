@@ -16,6 +16,11 @@ from apps.users.admin import (
 from apps.unidades.models.unidades import TipoGestaoChoices
 
 
+@pytest.fixture
+def cargo():
+    return Cargo.objects.create(codigo=1, nome="Desenvolvedor")
+
+
 @pytest.mark.django_db
 class TestUserAdmin:
 
@@ -29,9 +34,8 @@ class TestUserAdmin:
         response = admin_client.get(url, data={"q": "test"})
         assert response.status_code == HTTPStatus.OK
 
-    def test_add_user(self, admin_client):
+    def test_add_user(self, admin_client, cargo):
         url = reverse("admin:users_user_add")
-        cargo = Cargo.objects.create(codigo=1, nome="Desenvolvedor")
 
         response = admin_client.post(
             url,
@@ -47,6 +51,7 @@ class TestUserAdmin:
                 "is_active": True,
                 "is_staff": True,
                 "is_superuser": False,
+                "is_validado": True,
             },
             follow=True,
         )
@@ -59,6 +64,7 @@ class TestUserAdmin:
         url = reverse("admin:users_user_change", kwargs={"object_id": user.pk})
         response = admin_client.get(url)
         assert response.status_code == HTTPStatus.OK
+        assert b'is_validado' in response.content
 
     def test_get_readonly_fields_for_superuser(self):
         admin_instance = UserAdmin(User, admin.site)
@@ -86,9 +92,7 @@ class TestCargoAdmin:
 @pytest.mark.django_db
 class TestCustomUserCreationForm:
 
-    def test_valid_cpf(self):
-        cargo = Cargo.objects.create(codigo=4, nome="Designer")
-
+    def test_valid_cpf(self, cargo):
         form = CustomUserCreationForm(data={
             "username": "valido",
             "name": "Valido",
@@ -98,13 +102,12 @@ class TestCustomUserCreationForm:
             "unidades": [],
             "password1": "Test1234@",
             "password2": "Test1234@",
+            "is_validado": True,
         })
 
-        assert form.is_valid()
+        assert form.is_valid(), f"Form inválido com erros: {form.errors}"
 
-    def test_invalid_cpf(self):
-        cargo = Cargo.objects.create(codigo=2, nome="QA")
-
+    def test_invalid_cpf(self, cargo):
         form = CustomUserCreationForm(data={
             "username": "teste",
             "name": "Teste",
@@ -114,6 +117,7 @@ class TestCustomUserCreationForm:
             "unidades": [],
             "password1": "Test1234@",
             "password2": "Test1234@",
+            "is_validado": True,
         })
 
         assert not form.is_valid()
@@ -124,8 +128,7 @@ class TestCustomUserCreationForm:
 @pytest.mark.django_db
 class TestCustomUserChangeForm:
 
-    def test_valid_cpf(self):
-        cargo = Cargo.objects.create(codigo=5, nome="Analista")
+    def test_valid_cpf(self, cargo):
         user = User.objects.create_user(
             username="valido",
             name="Valido",
@@ -133,7 +136,8 @@ class TestCustomUserChangeForm:
             cargo=cargo,
             email="valido@example.com",
             rede="DIRETA",
-            password="Test1234@"
+            password="Test1234@",
+            is_validado=True
         )
 
         form = CustomUserChangeForm(
@@ -147,21 +151,22 @@ class TestCustomUserChangeForm:
                 "unidades": [],
                 "date_joined": user.date_joined,
                 "last_login": user.last_login,
+                "is_validado": True,
             },
             instance=user
         )
 
         assert form.is_valid(), f"Form inválido com erros: {form.errors}"
 
-    def test_invalid_cpf(self):
-        cargo = Cargo.objects.create(codigo=3, nome="DevOps")
+    def test_invalid_cpf(self, cargo):
         user = User.objects.create_user(
             username="teste",
             name="Teste",
             cpf="12345678900",
             cargo=cargo,
             rede="INDIRETA",
-            password="Test1234@"
+            password="Test1234@",
+            is_validado=True
         )
 
         form = CustomUserChangeForm(
@@ -175,6 +180,7 @@ class TestCustomUserChangeForm:
                 "unidades": [],
                 "date_joined": user.date_joined,
                 "last_login": user.last_login,
+                "is_validado": True,
             },
             instance=user
         )
@@ -184,14 +190,14 @@ class TestCustomUserChangeForm:
         assert form.errors['cpf'] == ['CPF deve conter apenas números']
 
 
-
 @pytest.mark.django_db
 class TestCustomAdminPasswordChangeForm:
 
     def test_removes_usable_password_field(self):
         user = User.objects.create_user(
             username="admin_test",
-            password="Test1234@"
+            password="Test1234@",
+            is_validado=True
         )
 
         form = CustomAdminPasswordChangeForm(user=user)

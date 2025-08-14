@@ -15,3 +15,11 @@ class UserNotFoundError(Exception):
 class InternalError(Exception):
     """Erro interno do sistema"""
     pass
+
+class EmailNaoCadastrado(Exception):
+    """Email não cadastrado"""
+    pass
+
+class SmeIntegracaoException(Exception):
+    """Problema na integração com a SME"""
+    pass
