@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+from rest_framework.serializers import ValidationError
 from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
 from apps.users.api.serializers.registrar_usuario_serializer import UserCreateSerializer
 from apps.users.models import Cargo
@@ -23,7 +24,7 @@ def user_data(unidade, cargo):
         'username': 'novousuario',
         'password': 'senha123',
         'name': 'Novo Usuário',
-        'email': 'novo@teste.com',
+        'email': 'novo@sme.prefeitura.sp.gov.br',
         'cpf': '12345678901',
         'cargo': cargo.pk,
         'unidades': [unidade.uuid],
@@ -37,7 +38,7 @@ def existing_user(cargo):
         username='usuarioexistente',
         password='senha123',
         name='Usuário Existente',
-        email='existente@teste.com',
+        email='existente@sme.prefeitura.sp.gov.br',
         cpf='11122233344',
         cargo=cargo,
         rede=TipoGestaoChoices.DIRETA,
@@ -60,17 +61,43 @@ class TestUserCreateSerializer:
         user_data['cpf'] = '123'
         serializer = UserCreateSerializer(data=user_data)
         assert not serializer.is_valid()
-        assert 'cpf' in serializer.errors
+        assert serializer.errors['field'] == 'cpf'
+        assert serializer.errors['detail'] == 'CPF inválido.'
 
     def test_invalid_cpf_repeated_digits(self, user_data):
         user_data['cpf'] = '11111111111'
         serializer = UserCreateSerializer(data=user_data)
         assert not serializer.is_valid()
-        assert 'cpf' in serializer.errors
+        assert serializer.errors['field'] == 'cpf'
+        assert serializer.errors['detail'] == 'CPF inválido.'
 
     def test_duplicate_cpf(self, user_data, existing_user):
         user_data['cpf'] = existing_user.cpf
         user_data['username'] = 'outro_nome'
         serializer = UserCreateSerializer(data=user_data)
         assert not serializer.is_valid()
-        assert 'cpf' in serializer.errors
+        assert serializer.errors['field'] == 'cpf'
+        assert serializer.errors['detail'] == 'Já existe um usuário com este CPF.'
+
+    def test_duplicate_email(self, user_data, existing_user):
+        user_data['email'] = existing_user.email
+        user_data['username'] = 'outro_nome'
+        serializer = UserCreateSerializer(data=user_data)
+        assert not serializer.is_valid()
+        assert serializer.errors['field'] == 'email'
+        assert serializer.errors['detail'] == 'Já existe um usuário com este e-mail.'
+
+    def test_invalid_email_domain(self, user_data):
+        user_data['email'] = 'teste@dominio.com'
+        serializer = UserCreateSerializer(data=user_data)
+        assert not serializer.is_valid()
+        assert serializer.errors['field'] == 'email'
+        assert serializer.errors['detail'] == 'Utilize seu e-mail institucional.'
+
+    def test_is_valid_with_raise_exception(self, user_data):
+        user_data['cpf'] = '123'
+        serializer = UserCreateSerializer(data=user_data)
+        with pytest.raises(ValidationError) as exc_info:
+            serializer.is_valid(raise_exception=True)
+        assert exc_info.value.detail['field'] == 'cpf'
+        assert exc_info.value.detail['detail'] == 'CPF inválido.'
