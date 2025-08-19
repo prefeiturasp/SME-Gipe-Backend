@@ -28,10 +28,7 @@ class UserCreateView(APIView):
         try:
             if not serializer.is_valid():
                 logger.warning(f"Erro de validação: {serializer.errors}")
-                return Response(
-                    {"detail": "Erro de validação nos dados enviados.", "erros": serializer.errors},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             self.perform_create(serializer)
             username = serializer.validated_data.get('username', 'usuário')
