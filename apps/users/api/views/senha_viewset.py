@@ -22,6 +22,10 @@ env = environ.Env()
 
 class EsqueciMinhaSenhaViewSet(APIView):
     permission_classes = [AllowAny]
+    MENSAGEM_DRE = "E-mail não encontrado! <br/>\
+Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
+    MENSAGEM_GIPE = "E-mail não encontrado! <br/>\
+Para resolver este problema, entre em contato com o GIPE."
 
 
     def post(self, request):
@@ -129,16 +133,13 @@ Verifique sua caixa de entrada ou lixo eletrônico!",
 
             if cargo_permitido:  # Diretor ou Assistente
                 logger.warning("RF %s é Diretor/Assistente sem email cadastrado.", username)
-                raise EmailNaoCadastrado(
-                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
-                )
+                raise EmailNaoCadastrado(self.MENSAGEM_DRE)
 
             # Verifica no banco local
             if getattr(user_local, "cargo_id", None) in [0, 1]:
                 logger.warning("RF %s sem email cadastrado. Encontrado no banco com cargo GIPE.", username)
-                raise EmailNaoCadastrado(
-                    "E-mail não encontrado! Para resolver este problema, entre em contato com o GIPE."
-               )
+                raise EmailNaoCadastrado(self.MENSAGEM_GIPE)
+
 
         logger.warning("RF %s sem cargo válido para acesso ao GIPE.", username)
         raise UserNotFoundError(
@@ -155,9 +156,8 @@ Verifique sua caixa de entrada ou lixo eletrônico!",
 
             if user_local.cargo_id == 3360 and not email:
                 logger.warning("CPF %s é Diretor sem email cadastrado.", username)
-                raise EmailNaoCadastrado(
-                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
-                )
+                raise EmailNaoCadastrado(self.MENSAGEM_DRE)
+
 
         else:  # Não achou no CoreSSO → verificar banco
             logger.warning("CPF %s não encontrado no CoreSSO. Consultando banco local.", username)
@@ -168,9 +168,8 @@ Verifique sua caixa de entrada ou lixo eletrônico!",
 
             if not getattr(user_local, "email", None):
                 logger.warning("CPF %s encontrado no banco sem email cadastrado.", username)
-                raise EmailNaoCadastrado(
-                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
-                )
+                raise EmailNaoCadastrado(self.MENSAGEM_DRE)
+
 
             logger.error("CPF %s não atende nenhum fluxo válido.", username)
             raise UserNotFoundError("Usuário ou RF não encontrado", usuario=username)
