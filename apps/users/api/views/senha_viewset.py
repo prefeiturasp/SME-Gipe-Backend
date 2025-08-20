@@ -8,75 +8,179 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.users.api.serializers.senha_serializer import EsqueciMinhaSenhaSerializer, RedefinirSenhaSerializer
-from apps.helpers.exceptions import EmailNaoCadastrado, SmeIntegracaoException
+from apps.helpers.utils import is_cpf, anonimizar_email
+from apps.helpers.exceptions import EmailNaoCadastrado, SmeIntegracaoException, UserNotFoundError
 from apps.users.services.senha_service import SenhaService
 from apps.users.services.sme_integracao_service import SmeIntegracaoService
 from apps.users.services.envia_email_service import EnviaEmailService
+from apps.users.services.cargos_service import CargosService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 env = environ.Env()
 
 
-
 class EsqueciMinhaSenhaViewSet(APIView):
     permission_classes = [AllowAny]
+
 
     def post(self, request):
         serializer = EsqueciMinhaSenhaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         username = serializer.validated_data["username"]
+
         try:
-            result = SmeIntegracaoService.informacao_usuario_sgp(username)
-            email = result.get("email")
-
-            if not email:
-                raise EmailNaoCadastrado(
-                    "Você não tem e-mail cadastrado e por isso a redefinição não é possível. "
-                    "Você deve procurar apoio na sua Diretoria Regional de Educação."
-                )
-
-            result = SenhaService.gerar_token_para_reset(username, email)
-
-            link_reset = f"{env('FRONTEND_URL')}/recuperar-senha/{result['uid']}/{result['token']}"
-            contexto_email = {
-                "nome_usuario": result.get('name'),
-                "link_reset": link_reset,
-                "aplicacao_url": env('FRONTEND_URL')
-            }
-
-            EnviaEmailService.enviar(
-                destinatario=email,
-                assunto="Redefinição de senha",
-                template_html="emails/reset_senha.html",
-                contexto=contexto_email,
+            logger.info(
+                "Iniciando fluxo de esqueci minha senha. Username: %s | Tipo: %s",
+                username, "CPF" if is_cpf(username) else "RF"
             )
 
-            return Response("Email enviado com sucesso", status=status.HTTP_200_OK)
+            user_local = User.objects.filter(username=username).first()
+            if not user_local:
+                logger.warning("Usuário %s não encontrado no banco local.", username)
+                raise UserNotFoundError("Usuário ou RF não encontrado", usuario=username)
 
+            # Tenta buscar no CoreSSO
+            try:
+                result = SmeIntegracaoService.informacao_usuario_sgp(username)
+                logger.info("Usuário encontrado no CoreSSO: %s", username)
+            except SmeIntegracaoException:
+                result = None
+                logger.warning("Usuário não encontrado no CoreSSO: %s", username)
+
+            email = result.get("email") if result else None
+
+            # Se tiver email válido e existir na base → gera token e envia
+            if email:
+                logger.info(
+                    "Usuário %s possui email. Iniciando envio de redefinição.", username
+                )
+                return self._processar_envio_email(username, email)  # Apenas executa
+
+            # Segrega fluxo
+            if is_cpf(username):
+                return self._processar_fluxo_cpf(username, result, email, user_local)
+            else:
+                return self._processar_fluxo_rf(username, result, email, user_local)
 
         except EmailNaoCadastrado as e:
+            logger.warning("Email não cadastrado para usuário: %s", username)
             return Response(
-                {"status": "email_nao_cadastrado", "message": str(e)},
-                status=status.HTTP_404_NOT_FOUND,
+                { "detail": str(e)},
+                status=status.HTTP_404_NOT_FOUND
             )
 
-        except SmeIntegracaoException as e:
+        except UserNotFoundError as e:
+            logger.warning("Usuário não autorizado ou não encontrado: %s", username)
             return Response(
-                {"status": "error", "message": f"{str(e)}"},
-                status=status.HTTP_204_NO_CONTENT,
+                {"detail": str(e)},
+                status=status.HTTP_401_UNAUTHORIZED      
             )
 
-        except Exception as e:
-            logger.exception("Erro inesperado no fluxo de esqueci minha senha")
+        except Exception:
+            logger.exception(
+                "Erro inesperado no fluxo de esqueci minha senha para username: %s", username
+            )
             return Response(
-                {
-                    "status": "erro_interno",
-                    "message": "Ocorreu um erro ao processar sua solicitação.",
-                },
+                {"detail": "Ocorreu um erro ao processar sua solicitação."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _processar_envio_email(self, username, email):
+        """Gera token e envia email de reset."""
+        logger.info("Gerando token de reset para usuário: %s", username)
+        token_data = SenhaService.gerar_token_para_reset(username, email)
+
+        link_reset = f"{env('FRONTEND_URL')}/recuperar-senha/{token_data['uid']}/{token_data['token']}"
+        contexto_email = {
+            "nome_usuario": token_data.get("name"),
+            "link_reset": link_reset,
+            "aplicacao_url": env("FRONTEND_URL"),
+        }
+
+        EnviaEmailService.enviar(
+            destinatario="marcelo.nunes@spassu.com.br",
+            assunto="Redefinição de senha",
+            template_html="emails/reset_senha.html",
+            contexto=contexto_email,
+        )
+
+        logger.info("Email de redefinição enviado com sucesso para usuário: %s", username)
+        return Response(
+                    {
+                        "detail": f"Seu link de recuperação de senha foi enviado para {anonimizar_email(email)}. <br/>\
+Verifique sua caixa de entrada ou lixo eletrônico!",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+    def _processar_fluxo_rf(self, username, result, email, user_local):
+        """Processa fluxo para RF (7-8 dígitos)."""
+        logger.info("Processando fluxo RF para usuário: %s", username)
+
+        if not result:
+            logger.warning("RF %s não encontrado no CoreSSO", username)
+            raise UserNotFoundError("Usuário ou RF não encontrado")
+
+        if not email:
+            logger.info("RF %s sem email cadastrado. Verificando cargos...", username)
+            cargos_data = CargosService.get_cargos(username, result.get("nome", ""))
+            cargo_permitido = CargosService.get_cargo_permitido(cargos_data)
+
+            if cargo_permitido:  # Diretor ou Assistente
+                logger.warning("RF %s é Diretor/Assistente sem email cadastrado.", username)
+                raise EmailNaoCadastrado(
+                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
+                )
+
+            # Verifica no banco local
+            if getattr(user_local, "cargo_id", None) in [0, 1]:
+                logger.warning("RF %s sem email cadastrado. Encontrado no banco com cargo GIPE.", username)
+                raise EmailNaoCadastrado(
+                    "E-mail não encontrado! Para resolver este problema, entre em contato com o GIPE."
+               )
+
+        logger.warning("RF %s sem cargo válido para acesso ao GIPE.", username)
+        raise UserNotFoundError(
+            f"Olá {result.get('nome', '').split(" ")[0]}! Desculpe, mas o acesso ao GIPE é restrito a perfis específicos."
+        )
+
+
+    def _processar_fluxo_cpf(self, username, result, email, user_local):
+        """Processa fluxo para CPF (11 dígitos)."""
+        logger.info("Processando fluxo CPF para usuário: %s", username)
+
+        if result:  # Achou no CoreSSO
+            logger.info("CPF %s encontrado no CoreSSO. Verificando cargos...", username)
+
+            if user_local.cargo_id == 3360 and not email:
+                logger.warning("CPF %s é Diretor sem email cadastrado.", username)
+                raise EmailNaoCadastrado(
+                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
+                )
+
+        else:  # Não achou no CoreSSO → verificar banco
+            logger.warning("CPF %s não encontrado no CoreSSO. Consultando banco local.", username)
+
+            if user_local.rede == "INDIRETA" and user_local.is_validado and user_local.email:
+                logger.info("CPF %s encontrado na rede indireta.", username)
+                return self._processar_envio_email(username, user_local.email)
+
+            if not getattr(user_local, "email", None):
+                logger.warning("CPF %s encontrado no banco sem email cadastrado.", username)
+                raise EmailNaoCadastrado(
+                    "E-mail não encontrado! Para resolver este problema, entre em contato com o Gabinete da Diretoria Regional de Educação (DRE)."
+                )
+
+            logger.error("CPF %s não atende nenhum fluxo válido.", username)
+            raise UserNotFoundError("Usuário ou RF não encontrado", usuario=username)
+
+        # Se nenhum caso específico for levantado, considera fluxo não tratado
+        logger.error("Fluxo CPF não tratado para usuário: %s", username)
+        raise UserNotFoundError(
+                    f"Olá {result.get('nome', '').split(" ")[0]}! Desculpe, mas o acesso ao GIPE é restrito a perfis específicos."
+                )    
+
 
 
 class RedefinirSenhaViewSet(APIView):
@@ -109,7 +213,7 @@ class RedefinirSenhaViewSet(APIView):
             return Response(
                 {
                     "status": "error", 
-                    "message": "Dados inválidos.", 
+                    "detail": "Dados inválidos.", 
                     "errors": serializer.errors
                 },
                 status=status.HTTP_400_BAD_REQUEST
@@ -136,7 +240,7 @@ class RedefinirSenhaViewSet(APIView):
                 return Response(
                     {
                         "status": "success", 
-                        "message": "Senha redefinida com sucesso."
+                        "detail": "Senha redefinida com sucesso."
                     }, 
                     status=status.HTTP_200_OK
                 )
@@ -146,7 +250,7 @@ class RedefinirSenhaViewSet(APIView):
             return Response(
                 {
                     "status": "error", 
-                    "message": str(e)
+                    "detail": str(e)
                 }, 
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -156,7 +260,7 @@ class RedefinirSenhaViewSet(APIView):
             return Response(
                 {
                     "status": "error",
-                    "message": "Erro interno do servidor. Tente novamente mais tarde.",
+                    "detail": "Erro interno do servidor. Tente novamente mais tarde.",
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
