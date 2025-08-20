@@ -77,7 +77,7 @@ class TestUserCreateSerializer:
         serializer = UserCreateSerializer(data=user_data)
         assert not serializer.is_valid()
         assert serializer.errors['field'] == 'cpf'
-        assert serializer.errors['detail'] == 'Já existe um usuário com este CPF.'
+        assert serializer.errors['detail'] == 'Já existe uma conta com este CPF.'
 
     def test_duplicate_email(self, user_data, existing_user):
         user_data['email'] = existing_user.email
@@ -85,7 +85,7 @@ class TestUserCreateSerializer:
         serializer = UserCreateSerializer(data=user_data)
         assert not serializer.is_valid()
         assert serializer.errors['field'] == 'email'
-        assert serializer.errors['detail'] == 'Já existe um usuário com este e-mail.'
+        assert serializer.errors['detail'] == 'Este e-mail já está cadastrado.'
 
     def test_invalid_email_domain(self, user_data):
         user_data['email'] = 'teste@dominio.com'
