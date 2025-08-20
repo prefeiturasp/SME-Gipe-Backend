@@ -28,7 +28,7 @@ class SmeIntegracaoService:
                 logger.info(f"Dados não encontrados: {response}")
                 raise SmeIntegracaoException('Dados não encontrados.')
 
-        except requests.RequestException as err:
+        except requests.RequestException:
             logger.exception("Erro de conexão com a API externa")
             raise requests.RequestException("Erro ao conectar-se à API externa.")
         
