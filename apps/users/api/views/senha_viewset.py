@@ -99,7 +99,7 @@ class EsqueciMinhaSenhaViewSet(APIView):
         }
 
         EnviaEmailService.enviar(
-            destinatario="marcelo.nunes@spassu.com.br",
+            destinatario=email,
             assunto="Redefinição de senha",
             template_html="emails/reset_senha.html",
             contexto=contexto_email,
