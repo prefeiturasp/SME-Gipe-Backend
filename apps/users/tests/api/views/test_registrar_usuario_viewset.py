@@ -73,7 +73,7 @@ class TestUserCreateView:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["field"] == "username"
-        assert response.data["detail"] == "Este usuário já está cadastrado."
+        assert response.data["detail"] == "Já existe uma conta com este CPF."
 
     def test_internal_server_error_returns_500(self, client, valid_payload):
 
