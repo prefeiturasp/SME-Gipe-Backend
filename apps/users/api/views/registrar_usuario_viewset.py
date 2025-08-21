@@ -1,4 +1,6 @@
 import logging
+import environ
+
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,9 +9,11 @@ from rest_framework import status, permissions
 from django.contrib.auth import get_user_model
 
 from apps.users.api.serializers.registrar_usuario_serializer import UserCreateSerializer
+from apps.users.services.envia_email_service import EnviaEmailService
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+env = environ.Env()
 
 
 class UserCreateView(APIView):
@@ -44,4 +48,23 @@ class UserCreateView(APIView):
             )
 
     def perform_create(self, serializer):
-        serializer.save()
+        """Cria o usuário e envia o e-mail de confirmação/boas-vindas."""
+        user = serializer.save()
+        name = user.name.split(" ")[0]
+
+        contexto_email = {
+            "nome_usuario": name,
+            "aplicacao_url": env("FRONTEND_URL"),
+        }
+
+        try:
+            EnviaEmailService.enviar(
+                destinatario=user.email,
+                assunto="Seu acesso ao GIPE foi aprovado!",
+                template_html="emails/confirmacao_cadastro.html",
+                contexto=contexto_email
+            )
+        except Exception as e:
+            logger.error(f"Falha ao enviar e-mail de confirmação: {e}")
+
+        return user
