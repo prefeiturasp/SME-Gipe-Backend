@@ -30,6 +30,7 @@ class User(AbstractUser):
         default=TipoGestaoChoices.DIRETA
     )
     is_validado = models.BooleanField("Validado", default=False, help_text="Indica se o usuário foi validado")
+    is_core_sso = models.BooleanField("CoreSSO", default=False, help_text="Indica se o usuário possue cadastro no coreSSO")
                               
     class Meta:
         verbose_name = "Usuário"
