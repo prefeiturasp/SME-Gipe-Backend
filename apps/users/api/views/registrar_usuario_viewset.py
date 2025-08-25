@@ -60,8 +60,8 @@ class UserCreateView(APIView):
         try:
             EnviaEmailService.enviar(
                 destinatario=user.email,
-                assunto="Seu acesso ao GIPE foi aprovado!",
-                template_html="emails/confirmacao_cadastro.html",
+                assunto="Solicitação de acesso ao GIPE.",
+                template_html="emails/solicitacao_cadastro.html",
                 contexto=contexto_email
             )
         except Exception as e:
