@@ -83,3 +83,13 @@ class TestUserCreateView:
             assert response.status_code == 500
             assert response.data["detail"] == "Erro interno ao criar usuário."
             assert "Erro simulado" in response.data["detalhes"]
+
+    def test_email_service_failure_logs_error(self, client, valid_payload, caplog):
+
+        with patch("apps.users.services.envia_email_service.EnviaEmailService.enviar", side_effect=Exception("Erro no envio de e-mail")):
+            response = client.post(self.endpoint, data=valid_payload, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert User.objects.filter(username=valid_payload["username"]).exists()
+
+        assert any("Falha ao enviar e-mail de confirmação" in rec.message for rec in caplog.records)
