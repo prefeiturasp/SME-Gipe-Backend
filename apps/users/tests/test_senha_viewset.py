@@ -1,22 +1,49 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.test import override_settings
-from apps.users.api.views.senha_viewset import EsqueciMinhaSenhaViewSet
-from rest_framework.exceptions import ValidationError
-from apps.helpers.exceptions import SmeIntegracaoException, UserNotFoundError, EmailNaoCadastrado
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from django.contrib.auth.tokens import default_token_generator
+
+from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIRequestFactory
-from rest_framework import status
-from apps.users.api.views.senha_viewset import RedefinirSenhaViewSet
+
+from apps.helpers.exceptions import (
+    EmailNaoCadastrado,
+    SmeIntegracaoException,
+    UserNotFoundError,
+)
+from apps.users.api.views.senha_viewset import (
+    AtualizarSenhaSerializer,
+    AtualizarSenhaViewSet,
+    EsqueciMinhaSenhaViewSet,
+    RedefinirSenhaViewSet,
+)
+
+
 
 User = get_user_model()
 
 @pytest.fixture
 def factory():
     return APIRequestFactory()
+
+@pytest.fixture
+def view():
+    return AtualizarSenhaViewSet()
+
+
+@pytest.fixture
+def mock_request():
+    request = MagicMock()
+    request.user = MagicMock()
+    request.user.username = "testuser"
+    request.user.check_password.return_value = True
+    request.user.id = 1
+    return request
 
 @pytest.mark.django_db
 class TestEsqueciMinhaSenhaViewSet:
@@ -424,7 +451,7 @@ class TestRedefinirSenhaViewSet:
             return "OK"
 
         monkeypatch.setattr(
-            "apps.users.api.views.senha_viewset.SmeIntegracaoService.redefine_senha",
+            "apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha",
             _mock_success
         )
 
@@ -462,7 +489,7 @@ class TestRedefinirSenhaViewSet:
             raise SmeIntegracaoException("Regra do SME: não permitido")
 
         monkeypatch.setattr(
-            "apps.users.api.views.senha_viewset.SmeIntegracaoService.redefine_senha",
+            "apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha",
             _mock_fail
         )
 
@@ -525,7 +552,7 @@ class TestRedefinirSenhaViewSet:
             raise SmeValidationError("Regra do SME: não permitido")
 
         monkeypatch.setattr(
-            "apps.users.api.views.senha_viewset.SmeIntegracaoService.redefine_senha",
+            "apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha",
             _mock_fail
         )
 
@@ -539,3 +566,143 @@ class TestRedefinirSenhaViewSet:
         # Senha local não deve ter sido alterada
         user.refresh_from_db()
         assert not user.check_password("SenhaPadr@o1")
+
+
+@pytest.mark.django_db
+class TestAtualizarSenhaViewSet:
+
+    def test_sucesso(self, view, mock_request):
+        mock_request.data = {
+            "username": "testuser",
+            "senha_atual": "senhaantiga",
+            "nova_senha": "novasenha123",
+            "confirmacao_nova_senha": "novasenha123"
+        }
+
+        # Mock do serializer
+        mock_serializer = MagicMock()
+        mock_serializer.is_valid.return_value = True
+        mock_serializer.validated_data = {"nova_senha": "novasenha123"}
+        
+        with patch('apps.users.api.serializers.senha_serializer.AtualizarSenhaSerializer') as mock_serializer_class:
+            mock_serializer_class.return_value = mock_serializer
+            
+            with patch('apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha'):
+                with patch.object(mock_request.user, 'set_password'):
+                    with patch.object(mock_request.user, 'save'):
+                        response = view.post(mock_request)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == "Senha alterada com sucesso."
+
+    def test_validation_error_confirmacao_senha_nao_corresponde(self, view, mock_request):
+        mock_request.data = {
+            "username": "testuser",
+            "senha_atual": "senhaantiga",
+            "nova_senha": "novasenha123",
+            "confirmacao_nova_senha": "diferente"
+        }
+
+        # Mock do serializer com erro
+        mock_serializer = MagicMock()
+        mock_serializer.is_valid.return_value = False
+        mock_serializer.errors = {"confirmacao_nova_senha": ["As senhas não coincidem."]}
+        
+        with patch('apps.users.api.serializers.senha_serializer.AtualizarSenhaSerializer') as mock_serializer_class:
+            mock_serializer_class.return_value = mock_serializer
+            
+            response = view.post(mock_request)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+    def test_validation_error_senha_atual_incorreta_pela_view(self, view, mock_request):
+        """Testa o ValidationError específico: 'Senha atual incorreta'"""
+        mock_request.data = {
+            "username": "testuser",  # Igual ao usuário autenticado
+            "senha_atual": "senha_errada",  # Senha incorreta
+            "nova_senha": "novasenha123",
+            "confirmacao_nova_senha": "novasenha123"
+        }
+
+        # Mock para simular senha incorreta
+        mock_request.user.check_password.return_value = False
+
+        response = view.post(mock_request)
+
+        print("response.data[detail]", response.data["detail"])
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["detail"] == "Senha atual incorreta."
+        assert response.data["field"] == "senha_atual"
+
+    def test_serializer_raise_exception_true_line(self, mock_request):
+        """Garante que a linha `raise serializers.ValidationError(self._errors)` do is_valid seja executada."""
+
+        data = {
+            "username": "",  # Dados faltando para forçar erro
+            "senha_atual": "",
+            "nova_senha": "",
+            "confirmacao_nova_senha": ""
+        }
+
+        serializer = AtualizarSenhaSerializer(
+            data=data,
+            context={"request": mock_request}
+        )
+
+        with pytest.raises(serializers.ValidationError) as exc_info:
+            serializer.is_valid(raise_exception=True)  # Seta raise_exception dentro do is_valid
+
+        # Verifica que o serializer realmente levantou o erro esperado
+        detail = exc_info.value.detail
+        assert "detail" in detail
+        assert "field" in detail
+
+
+    def test_erro_sme(self, view, mock_request):
+        mock_request.data = {
+            "username": "testuser",
+            "senha_atual": "senhaantiga",
+            "nova_senha": "novasenha123",
+            "confirmacao_nova_senha": "novasenha123"
+        }
+
+        # Mock do serializer válido
+        mock_serializer = MagicMock()
+        mock_serializer.is_valid.return_value = True
+        mock_serializer.validated_data = {"nova_senha": "novasenha123"}
+        
+        with patch('apps.users.api.serializers.senha_serializer.AtualizarSenhaSerializer') as mock_serializer_class:
+            mock_serializer_class.return_value = mock_serializer
+            
+            with patch('apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha', 
+                      side_effect=SmeIntegracaoException("Erro SME")):
+                response = view.post(mock_request)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Erro SME" in response.data["detail"]
+
+    def test_erro_inesperado(self, view, mock_request):
+        mock_request.data = {
+            "username": "testuser",
+            "senha_atual": "senhaantiga",
+            "nova_senha": "novasenha123",
+            "confirmacao_nova_senha": "novasenha123"
+        }
+
+        # Mock do serializer válido
+        mock_serializer = MagicMock()
+        mock_serializer.is_valid.return_value = True
+        mock_serializer.validated_data = {"nova_senha": "novasenha123"}
+        
+        with patch('apps.users.api.serializers.senha_serializer.AtualizarSenhaSerializer') as mock_serializer_class:
+            mock_serializer_class.return_value = mock_serializer
+            
+            with patch('apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha', 
+                      side_effect=Exception("Erro inesperado")):
+                with patch('apps.users.api.views.senha_viewset.logger.exception'):
+                    response = view.post(mock_request)
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data["detail"] == "Erro interno do servidor."
