@@ -75,7 +75,9 @@ class SmeIntegracaoService:
                 result = "OK"
                 return result
             else:
-                logger.info("Erro ao redefinir senha: %s", response.content.decode('utf-8'))
-                raise SmeIntegracaoException(f"Erro ao redefinir senha: {response.content.decode('utf-8')}")
+                texto = response.content.decode('utf-8')
+                mensagem = texto.strip("{}'\"")
+                logger.info("Erro ao redefinir senha: %s", mensagem)
+                raise SmeIntegracaoException(mensagem)
         except Exception as err:
             raise SmeIntegracaoException(str(err))
