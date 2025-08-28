@@ -6,7 +6,7 @@ import requests
 
 
 @patch("requests.get")
-class TestSmeIntegracaoService:
+class TestInformacaoUsuarioSGP:
     def test_sucesso_ao_buscar_usuario(self, mock_get):
         """Testa quando a API retorna os dados do usuário com sucesso"""
         mock_response = MagicMock()
@@ -58,3 +58,64 @@ class TestSmeIntegracaoService:
             SmeIntegracaoService.informacao_usuario_sgp("1234567")
 
         assert "Dados não encontrados" in str(erro.value)
+
+
+@patch("apps.users.services.sme_integracao_service.requests.get")
+class TestUsuarioCoreSSOOrNone:
+    def test_usuario_encontrado(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"login": "12345678901"}
+        mock_get.return_value = mock_response
+
+        result = SmeIntegracaoService.usuario_core_sso_or_none("12345678901")
+
+        assert result == {"login": "12345678901"}
+
+    def test_usuario_nao_encontrado(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.text = "Not Found"
+        mock_get.return_value = mock_response
+
+        result = SmeIntegracaoService.usuario_core_sso_or_none("12345678901")
+
+        assert result is None
+
+    def test_request_exception(self, mock_get):
+        mock_get.side_effect = requests.RequestException("Falha de rede")
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.usuario_core_sso_or_none("12345678901")
+
+        assert "Erro ao procurar usuário" in str(exc.value)
+
+
+@patch("apps.users.services.sme_integracao_service.requests.post")
+class TestCriaUsuarioCoreSSO:
+    def test_sucesso(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        result = SmeIntegracaoService.cria_usuario_core_sso(
+            login="12345678901",
+                nome="Usuário",
+                email="usuario@example.com",
+                e_servidor="N",
+            )
+
+        assert result is True
+
+    def test_request_exception(self, mock_post):
+        mock_post.side_effect = requests.RequestException("Erro HTTP")
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.cria_usuario_core_sso(
+                login="12345678901",
+                nome="Usuário",
+                email="usuario@example.com",
+                e_servidor="N",
+            )
+
+        assert "Erro ao criar o usuário" in str(exc.value)
