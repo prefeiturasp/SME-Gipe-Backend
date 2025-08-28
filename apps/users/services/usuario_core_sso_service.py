@@ -89,6 +89,5 @@ class CriaUsuarioCoreSSOService:
         SmeIntegracaoService.cria_usuario_core_sso(
             login=dados_usuario["login"],
             nome=dados_usuario["nome"],
-            email=dados_usuario["email"],
-            e_servidor="N",
+            email=dados_usuario["email"]
         )

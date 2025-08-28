@@ -116,7 +116,7 @@ class SmeIntegracaoService:
             ) from err
         
     @classmethod
-    def cria_usuario_core_sso(cls, login: str, nome: str, email: str, e_servidor: str) -> bool:
+    def cria_usuario_core_sso(cls, login: str, nome: str, email: str) -> bool:
         """ Cria um novo usuário no CoreSSO. """
 
         logger.info("Iniciando criação de usuário no CoreSSO: %s", login)
@@ -128,8 +128,8 @@ class SmeIntegracaoService:
         payload = {
             "nome": nome,
             "documento": login,
-            "email": email,
-            "e_servidor": e_servidor
+            "codigoRf": "",
+            "email": email
         }
 
         try:
