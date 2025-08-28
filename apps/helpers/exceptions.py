@@ -23,3 +23,7 @@ class EmailNaoCadastrado(Exception):
 class SmeIntegracaoException(Exception):
     """Problema na integração com a SME"""
     pass
+
+class CargaUsuarioException(Exception):
+    """Erro ao cadastrar usuário no CoreSSO"""
+    pass
