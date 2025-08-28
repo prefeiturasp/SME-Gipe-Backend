@@ -54,7 +54,7 @@ class TestSmeRedefinirSenhaService:
 
         with pytest.raises(SmeIntegracaoException) as exc:
             SmeIntegracaoService.redefine_senha("7210418", "NovaSenha@123")
-        assert "Erro ao redefinir senha" in str(exc.value)
+        assert "Erro qualquer" in str(exc.value)
 
     def test_redefine_senha_missing_args(self):
         with pytest.raises(SmeIntegracaoException):

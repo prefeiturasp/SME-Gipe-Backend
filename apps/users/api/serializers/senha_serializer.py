@@ -15,15 +15,6 @@ User = get_user_model()
 class EsqueciMinhaSenhaSerializer(serializers.Serializer):
     username = serializers.CharField(required=True, min_length=7, max_length=11)
 
-    def validate(self, data):
-        username = data.get("username", "").strip()
-
-        if not User.objects.filter(username=username).exists():
-            raise serializers.ValidationError(f"Usuário {username} não encontrado.")
-
-        return data
-
-
 
 class RedefinirSenhaSerializer(serializers.Serializer):
     """
@@ -91,3 +82,36 @@ class RedefinirSenhaSerializer(serializers.Serializer):
         logger.info("Validação bem-sucedida para redefinição de senha do usuário ID: %s", user.id)
         
         return attrs
+
+
+class AtualizarSenhaSerializer(serializers.Serializer):
+    senha_atual = serializers.CharField(write_only=True)
+    nova_senha = serializers.CharField(write_only=True)
+    confirmacao_nova_senha = serializers.CharField(write_only=True)
+
+    def is_valid(self, raise_exception=False):
+        valid = super().is_valid(raise_exception=False)
+        if not valid:
+            first_field, first_error = next(iter(self.errors.items()))
+            message = first_error[0] if isinstance(first_error, list) else str(first_error)
+
+            self._errors = {
+                "detail": message,
+                "field": first_field
+            }
+
+            if raise_exception:
+                raise serializers.ValidationError(self._errors)
+
+        return valid
+
+    def validate(self, data):
+        user = self.context["request"].user
+
+        if not user.check_password(data["senha_atual"]):
+            raise serializers.ValidationError({"senha_atual": "Senha atual incorreta."})
+
+        if data["nova_senha"] != data["confirmacao_nova_senha"]:
+            raise serializers.ValidationError({"confirmacao_nova_senha": "As senhas não coincidem."})
+
+        return data

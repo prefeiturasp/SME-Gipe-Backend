@@ -13,6 +13,7 @@ class SmeIntegracaoService:
         'accept': 'application/json',
         "x-api-eol-key": env("SME_INTEGRACAO_TOKEN", default=""),
     }
+    DEFAULT_TIMEOUT = 10
 
     @classmethod
     def informacao_usuario_sgp(cls, username):
@@ -28,7 +29,7 @@ class SmeIntegracaoService:
                 logger.info(f"Dados não encontrados: {response}")
                 raise SmeIntegracaoException('Dados não encontrados.')
 
-        except requests.RequestException as err:
+        except requests.RequestException:
             logger.exception("Erro de conexão com a API externa")
             raise requests.RequestException("Erro ao conectar-se à API externa.")
         
@@ -75,7 +76,76 @@ class SmeIntegracaoService:
                 result = "OK"
                 return result
             else:
-                logger.info("Erro ao redefinir senha: %s", response.content.decode('utf-8'))
-                raise SmeIntegracaoException(f"Erro ao redefinir senha: {response.content.decode('utf-8')}")
+                texto = response.content.decode('utf-8')
+                mensagem = texto.strip("{}'\"")
+                logger.info("Erro ao redefinir senha: %s", mensagem)
+                raise SmeIntegracaoException(mensagem)
         except Exception as err:
             raise SmeIntegracaoException(str(err))
+        
+    @classmethod
+    def usuario_core_sso_or_none(cls, login: str):
+        """ Consulta usuário no CoreSSO. """
+
+        logger.info("Consultando informação do usuário %s no CoreSSO.", login)
+
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/AutenticacaoSgp/{login}/dados"
+
+        try:
+            response = requests.get(url, headers=cls.DEFAULT_HEADERS, timeout=cls.DEFAULT_TIMEOUT)
+
+            if response.status_code == status.HTTP_200_OK:
+                return response.json()
+
+            logger.warning(
+                "Usuário %s não encontrado no CoreSSO. Status: %s. Detalhes: %s",
+                login,
+                response.status_code,
+                response.text,
+            )
+            return None
+
+        except requests.RequestException as err:
+            logger.error(
+                "Falha de comunicação ao procurar usuário %s no CoreSSO: %s",
+                login,
+                str(err),
+            )
+            raise SmeIntegracaoException(
+                f"Erro ao procurar usuário {login} no CoreSSO."
+            ) from err
+        
+    @classmethod
+    def cria_usuario_core_sso(cls, login: str, nome: str, email: str) -> bool:
+        """ Cria um novo usuário no CoreSSO. """
+
+        logger.info("Iniciando criação de usuário no CoreSSO: %s", login)
+
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/v1/usuarios/coresso"
+
+        headers = {**cls.DEFAULT_HEADERS, "Content-Type": "application/json-patch+json"}
+
+        payload = {
+            "nome": nome,
+            "documento": login,
+            "codigoRf": "",
+            "email": email
+        }
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=cls.DEFAULT_TIMEOUT)
+            response.raise_for_status()
+
+            logger.info("Usuário %s criado com sucesso no CoreSSO.", login)
+            return True
+
+        except requests.RequestException as err:
+            logger.error(
+                "Erro ao criar usuário no CoreSSO (%s). Status: %s. Detalhes: %s",
+                login,
+                getattr(err.response, "status_code", "N/A"),
+                getattr(err.response, "text", str(err)),
+            )
+            raise SmeIntegracaoException(
+                f"Erro ao criar o usuário {nome} no CoreSSO."
+            ) from err

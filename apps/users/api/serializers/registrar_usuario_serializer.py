@@ -16,6 +16,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
         many=True
     )
     cpf = serializers.CharField()
+    username = serializers.CharField(validators=[])
+    email = serializers.EmailField(validators=[])
 
     class Meta:
         model = User
@@ -27,6 +29,22 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}
         }
 
+    def is_valid(self, raise_exception=False):
+        valid = super().is_valid(raise_exception=False)
+        if not valid:
+            first_field, first_error = next(iter(self.errors.items()))
+            message = first_error[0] if isinstance(first_error, list) else str(first_error)
+
+            self._errors = {
+                "detail": message,
+                "field": first_field
+            }
+
+            if raise_exception:
+                raise serializers.ValidationError(self._errors)
+
+        return valid
+
     def validate_cpf(self, value):
 
         cpf = re.sub(r'\D', '', value)
@@ -34,9 +52,23 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("CPF inválido.")
         
         if User.objects.filter(cpf=cpf).exists():
-            raise serializers.ValidationError("Já existe um usuário com este CPF.")
+            raise serializers.ValidationError("Já existe uma conta com este CPF.")
         
         return cpf
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Já existe uma conta com este CPF.")
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Este e-mail já está cadastrado.")
+
+        if not value.endswith("@sme.prefeitura.sp.gov.br"):
+            raise serializers.ValidationError("Utilize seu e-mail institucional.")
+
+        return value
 
     def create(self, validated_data):
 

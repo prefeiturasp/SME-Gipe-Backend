@@ -29,7 +29,7 @@ def valid_payload(unidade, cargo):
         "username": "usuarioapi",
         "password": "senha123",
         "name": "Usuário API",
-        "email": "api@teste.com",
+        "email": "api@sme.prefeitura.sp.gov.br",
         "cpf": "98765432100",
         "cargo": cargo.pk,
         "unidades": [unidade.uuid],
@@ -55,7 +55,8 @@ class TestUserCreateView:
         response = client.post(self.endpoint, data=valid_payload, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "cpf" in response.data["erros"]
+        assert response.data["field"] == "cpf"
+        assert response.data["detail"] == "CPF inválido."
 
     def test_duplicate_username_returns_400(self, client, valid_payload):
 
@@ -63,7 +64,7 @@ class TestUserCreateView:
             username=valid_payload["username"],
             password="senha123",
             name="Já existe",
-            email="outro@teste.com",
+            email="outro@sme.prefeitura.sp.gov.br",
             cpf="11122233344",
             cargo_id=valid_payload["cargo"],
             rede=valid_payload["rede"]
@@ -71,7 +72,8 @@ class TestUserCreateView:
         response = client.post(self.endpoint, data=valid_payload, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data["erros"]
+        assert response.data["field"] == "username"
+        assert response.data["detail"] == "Já existe uma conta com este CPF."
 
     def test_internal_server_error_returns_500(self, client, valid_payload):
 
@@ -80,3 +82,14 @@ class TestUserCreateView:
 
             assert response.status_code == 500
             assert response.data["detail"] == "Erro interno ao criar usuário."
+            assert "Erro simulado" in response.data["detalhes"]
+
+    def test_email_service_failure_logs_error(self, client, valid_payload, caplog):
+
+        with patch("apps.users.services.envia_email_service.EnviaEmailService.enviar", side_effect=Exception("Erro no envio de e-mail")):
+            response = client.post(self.endpoint, data=valid_payload, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert User.objects.filter(username=valid_payload["username"]).exists()
+
+        assert any("Falha ao enviar e-mail de confirmação" in rec.message for rec in caplog.records)

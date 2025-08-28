@@ -1,5 +1,6 @@
 from django import forms
-from django.contrib import admin
+from django.shortcuts import render
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -7,6 +8,8 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPas
 
 from .models import User, Cargo
 from apps.unidades.models.unidades import TipoGestaoChoices
+from apps.helpers.exceptions import CargaUsuarioException
+from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
 User = get_user_model()
 
@@ -81,13 +84,12 @@ class UserAdmin(BaseUserAdmin):
     add_form = CustomUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
     # Campos exibidos na lista de usuários
-    list_display = ('username', 'name', 'email', 'cargo', 'rede', 'is_validado')
-    list_editable = ('is_validado',)
-
+    list_display = ('username', 'name', 'email', 'cargo', 'rede', 'is_validado', 'is_core_sso')
+    
     search_fields = ('username', 'name', 'email', 'cpf')
     ordering = ('username',)
 
-    list_filter = ('rede', 'is_validado') + BaseUserAdmin.list_filter
+    list_filter = ('rede', 'is_validado', 'is_core_sso') # + BaseUserAdmin.list_filter
 
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
@@ -119,6 +121,66 @@ class UserAdmin(BaseUserAdmin):
         if not request.user.is_superuser:
             readonly_fields.append('is_superuser')
         return readonly_fields
+
+    @admin.action(description="Enviar usuários para CoreSSO")
+    def enviar_para_core_sso(self, request, queryset):
+
+        if 'confirm' in request.POST:
+            enviados = 0
+            erros = 0
+            erros_detalhes = []
+
+            queryset_filtrado = queryset.filter(
+                rede=TipoGestaoChoices.INDIRETA,
+                is_validado=True
+            )
+
+            for usuario in queryset_filtrado:
+
+                dados_usuario = {
+                    "login": usuario.username,
+                    "nome": usuario.name,
+                    "email": usuario.email,
+                }
+
+                try:
+                    CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario)
+                    enviados += 1
+                    
+                except CargaUsuarioException as e:
+                    erros += 1
+                    erros_detalhes.append(f"{usuario.username}: {str(e)}")
+
+            ignorados = queryset.count() - queryset_filtrado.count()
+
+            if enviados:
+                self.message_user(
+                    request,
+                    f"{enviados} usuário(s) registrado(s) com sucesso no CoreSSO!",
+                    messages.SUCCESS
+                )
+
+            if erros:
+                for detalhe in erros_detalhes:
+                    self.message_user(request, detalhe, messages.ERROR)
+
+            if ignorados:
+                self.message_user(
+                    request,
+                    f"Erro no registo de {ignorados} usuário(s). É necessário cumprir todos os requisitos.",
+                    messages.WARNING
+                )
+        
+            return None
+
+        request.current_app = self.admin_site.name
+        return render(request, "admin/users/user/confirm_enviar_core_sso.html", {
+            "queryset": queryset,
+            "action": "enviar_para_core_sso",
+            "title": "Você confirma o envio dos usuários selecionados para o CoreSSO?",
+        })
+    
+    actions = ["enviar_para_core_sso"]
 
 
 @admin.register(Cargo)
