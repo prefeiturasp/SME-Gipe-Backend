@@ -8,6 +8,8 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPas
 
 from .models import User, Cargo
 from apps.unidades.models.unidades import TipoGestaoChoices
+from apps.helpers.exceptions import CargaUsuarioException
+from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
 User = get_user_model()
 
@@ -124,26 +126,49 @@ class UserAdmin(BaseUserAdmin):
     def enviar_para_core_sso(self, request, queryset):
 
         if 'confirm' in request.POST:
+            enviados = 0
+            erros = 0
+            erros_detalhes = []
 
             queryset_filtrado = queryset.filter(
                 rede=TipoGestaoChoices.INDIRETA,
                 is_validado=True
             )
 
-            updated = queryset_filtrado.update(is_active=False)
+            for usuario in queryset_filtrado:
+
+                dados_usuario = {
+                    "login": usuario.username,
+                    "nome": usuario.name,
+                    "email": usuario.email,
+                }
+
+                try:
+                    CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario)
+                    enviados += 1
+                    
+                except CargaUsuarioException as e:
+                    erros += 1
+                    erros_detalhes.append(f"{usuario.username}: {str(e)}")
+
             ignorados = queryset.count() - queryset_filtrado.count()
 
-            self.message_user(
-                request,
-                f"{updated} usuário(s) registrado(s) com sucesso no CoreSSO!",
-                messages.SUCCESS
-            )
+            if enviados:
+                self.message_user(
+                    request,
+                    f"{enviados} usuário(s) registrado(s) com sucesso no CoreSSO!",
+                    messages.SUCCESS
+                )
+
+            if erros:
+                for detalhe in erros_detalhes:
+                    self.message_user(request, detalhe, messages.ERROR)
 
             if ignorados:
                 self.message_user(
                     request,
                     f"Erro no registo de {ignorados} usuário(s). É necessário cumprir todos os requisitos.",
-                    messages.ERROR
+                    messages.WARNING
                 )
         
             return None
