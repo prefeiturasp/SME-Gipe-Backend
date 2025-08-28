@@ -101,8 +101,7 @@ class TestCriaUsuarioCoreSSO:
         result = SmeIntegracaoService.cria_usuario_core_sso(
             login="12345678901",
                 nome="Usuário",
-                email="usuario@example.com",
-                e_servidor="N",
+                email="usuario@example.com"
             )
 
         assert result is True
@@ -114,8 +113,7 @@ class TestCriaUsuarioCoreSSO:
             SmeIntegracaoService.cria_usuario_core_sso(
                 login="12345678901",
                 nome="Usuário",
-                email="usuario@example.com",
-                e_servidor="N",
+                email="usuario@example.com"
             )
 
         assert "Erro ao criar o usuário" in str(exc.value)

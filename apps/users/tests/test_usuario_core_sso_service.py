@@ -135,6 +135,5 @@ class TestCriaUsuarioCoreSSOService:
             mock_cria.assert_called_once_with(
                 login=dados_usuario_validos["login"],
                 nome=dados_usuario_validos["nome"],
-                email=dados_usuario_validos["email"],
-                e_servidor="N"
+                email=dados_usuario_validos["email"]
             )
