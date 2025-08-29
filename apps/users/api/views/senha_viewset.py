@@ -71,7 +71,7 @@ Para resolver este problema, entre em contato com o GIPE."
             logger.warning("Email não cadastrado para usuário: %s", username)
             return Response(
                 { "detail": str(e)},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         except UserNotFoundError as e:
