@@ -119,7 +119,7 @@ class TestEsqueciMinhaSenhaViewSet:
         request = MagicMock(data={'username': '1234567'})
         
         response = view.post(request)
-        assert response.status_code == 404  # EmailNaoCadastrado retorna 404
+        assert response.status_code == 400
         assert "E-mail não encontrado" in response.data['detail']
         assert "Gabinete da Diretoria Regional de Educação (DRE)" in response.data['detail']
 
@@ -246,7 +246,7 @@ class TestEsqueciMinhaSenhaViewSet:
         request = MagicMock(data={'username': '1234567'})
         
         response = view.post(request)
-        assert response.status_code == 404
+        assert response.status_code == 400
         assert "E-mail não encontrado" in response.data['detail']
         assert "GIPE" in response.data['detail']
 
@@ -275,7 +275,7 @@ class TestEsqueciMinhaSenhaViewSet:
         request = MagicMock(data={'username': '12345678901'})
         
         response = view.post(request)
-        assert response.status_code == 404
+        assert response.status_code == 400
         assert "E-mail não encontrado" in response.data['detail']
         assert "Gabinete da Diretoria Regional de Educação (DRE)" in response.data['detail']
 
@@ -312,7 +312,7 @@ class TestEsqueciMinhaSenhaViewSet:
         request = MagicMock(data={'username': '12345678901'})
         
         response = view.post(request)
-        assert response.status_code == 404
+        assert response.status_code == 400
         assert "E-mail não encontrado" in response.data['detail']
         assert "Gabinete da Diretoria Regional de Educação (DRE)" in response.data['detail']
 
