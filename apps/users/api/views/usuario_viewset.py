@@ -7,8 +7,9 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 
 from django.contrib.auth import get_user_model
+from django.utils.timezone import now
 
-from apps.users.api.serializers.registrar_usuario_serializer import UserCreateSerializer
+from apps.users.api.serializers.usuario_serializer import UserCreateSerializer, UserUpdateSerializer
 from apps.users.services.envia_email_service import EnviaEmailService
 
 User = get_user_model()
@@ -68,3 +69,33 @@ class UserCreateView(APIView):
             logger.error(f"Falha ao enviar e-mail de confirmação: {e}")
 
         return user
+    
+
+class UserUpdateView(APIView):
+    """View para atualização dos dados do usuário (ex.: nome)."""
+    
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def put(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
+
+        if not serializer.is_valid():
+            logger.warning(f"Erro ao atualizar usuário {user.username}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            serializer.save()
+
+            logger.info(f"Usuário {user.username} atualizou o nome em {now().isoformat()}")
+
+            return Response(
+                {"detail": "Tudo certo por aqui!<br/>Seu nome foi atualizado."},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.exception("Erro inesperado na alteração do nome usuário username: %s", user.username)
+            return Response(
+                {"detail": "Erro interno do servidor."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
