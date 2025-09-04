@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.serializers import ValidationError
 from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
-from apps.users.api.serializers.registrar_usuario_serializer import UserCreateSerializer
+from apps.users.api.serializers.usuario_serializer import UserCreateSerializer
 from apps.users.models import Cargo
 
 User = get_user_model()
