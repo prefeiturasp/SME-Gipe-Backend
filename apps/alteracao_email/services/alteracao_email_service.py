@@ -1,8 +1,14 @@
 import logging
 import environ
+from django.utils.timezone import now, timedelta
+from django.shortcuts import get_object_or_404
 
-from apps.users.services.envia_email_service import EnviaEmailService
 from apps.alteracao_email.models.alteracao_email import AlteracaoEmail
+from apps.users.services.envia_email_service import EnviaEmailService
+from apps.helpers.exceptions import (
+    TokenJaUtilizadoException,
+    TokenExpiradoException,
+)
 
 env = environ.Env()
 logger = logging.getLogger(__name__)
@@ -29,3 +35,24 @@ class AlteracaoEmailService:
         )
 
         return email_request
+
+    @staticmethod
+    def validar(token):
+        
+        email_request = get_object_or_404(AlteracaoEmail, token=token)
+        usuario = email_request.usuario
+
+        if email_request.ja_usado:
+            raise TokenJaUtilizadoException("Este token já foi utilizado.")
+
+        if email_request.criado_em < now() - timedelta(minutes=30):
+            raise TokenExpiradoException("Token expirado.")
+
+        usuario.email = email_request.novo_email
+        usuario.save()
+
+        email_request.ja_usado = True
+        email_request.save()
+
+        logger.info(f"E-mail alterado com sucesso: {usuario.email}")
+        return usuario
