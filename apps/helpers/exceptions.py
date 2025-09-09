@@ -27,3 +27,11 @@ class SmeIntegracaoException(Exception):
 class CargaUsuarioException(Exception):
     """Erro ao cadastrar usuário no CoreSSO"""
     pass
+
+class TokenJaUtilizadoException(Exception):
+    """Token de validação já foi usado."""
+    pass
+
+class TokenExpiradoException(Exception):
+    """Token de validação expirou."""
+    pass
