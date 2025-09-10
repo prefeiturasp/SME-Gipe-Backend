@@ -38,8 +38,11 @@ class ValidarAlteracaoEmailViewSet(viewsets.ViewSet):
     def update(self, request, pk=None):
 
         try:
-            AlteracaoEmailService.validar(pk)
-            return Response({"message": "E-mail alterado com sucesso."}, status=status.HTTP_200_OK)
+            usuario = AlteracaoEmailService.validar(pk)
+            return Response(
+                {"message": "E-mail alterado com sucesso.", "email": usuario.email},
+                status=status.HTTP_200_OK,
+            )
         
         except TokenJaUtilizadoException as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
