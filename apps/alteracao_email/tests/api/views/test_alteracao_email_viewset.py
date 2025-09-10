@@ -70,11 +70,12 @@ class TestValidarAlteracaoEmailViewSet:
         api_client.force_authenticate(user=user)
         pk = "123"
 
-        with patch.object(AlteracaoEmailService, "validar", return_value=None):
+        with patch.object(AlteracaoEmailService, "validar", return_value=user):
             response = api_client.put(f"{self.endpoint}{pk}/")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["message"] == "E-mail alterado com sucesso."
+        assert response.data["email"] == user.email
 
     def test_update_token_ja_utilizado(self, api_client, user):
 
