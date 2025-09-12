@@ -88,12 +88,11 @@ class TestCriaUsuarioCoreSSOService:
 
         assert "Erro inesperado" in str(exc.value)
 
-    @patch("apps.users.services.usuario_core_sso_service.User.objects")
+    @patch("apps.users.services.usuario_core_sso_service.User.objects.get")
     @patch("apps.users.services.usuario_core_sso_service.CriaUsuarioCoreSSOService._usuario_existe")
-    def test_usuario_local_nao_encontrado(self, mock_usuario_existe, mock_user_objects, dados_usuario_validos):
-
+    def test_usuario_local_nao_encontrado(self, mock_usuario_existe, mock_user_get, dados_usuario_validos):
         mock_usuario_existe.return_value = {"login": dados_usuario_validos["login"]}
-        mock_user_objects.filter.return_value.update.return_value = 0
+        mock_user_get.side_effect = User.DoesNotExist
 
         with pytest.raises(CargaUsuarioException) as exc:
             CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario_validos)

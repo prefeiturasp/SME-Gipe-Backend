@@ -59,8 +59,11 @@ class CriaUsuarioCoreSSOService:
     def _adiciona_flag_core_sso(cls, login: str):
         """ Atribui a flag is_core_sso no DB local """
 
-        updated = User.objects.filter(username=login).update(is_core_sso=True)
-        if not updated:
+        try:
+            user = User.objects.get(username=login)
+            user.is_core_sso = True
+            user.save()
+        except User.DoesNotExist:
             logger.warning("Usuário com CPF %s não encontrado", login)
             raise CargaUsuarioException(f"Usuário {login} não encontrado.")
         
@@ -80,7 +83,7 @@ class CriaUsuarioCoreSSOService:
         for campo, erros in detail.items():
             for erro in erros:
                 mensagens.append(f"{campo.capitalize()}: {erro}")
-        return f"Usuário inválido. Motivo(s): " + "; ".join(mensagens)
+        return "Usuário inválido. Motivo(s): " + "; ".join(mensagens)
 
     @staticmethod
     def _criar_usuario(dados_usuario: dict):

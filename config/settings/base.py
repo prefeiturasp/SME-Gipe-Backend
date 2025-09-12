@@ -94,6 +94,7 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "drf_spectacular",
+    "auditlog",
 ]
 
 LOCAL_APPS = [
@@ -164,6 +165,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "apps.users.middleware.AuditlogMiddleware",
 ]
 
 # STATIC
