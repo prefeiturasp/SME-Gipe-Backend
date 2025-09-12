@@ -9,5 +9,4 @@ class UsersConfig(AppConfig):
     verbose_name = _("Users")
 
     def ready(self):
-        with contextlib.suppress(ImportError):
-            import apps.users.signals  # noqa: F401
+        import apps.users.auditlog_registry
