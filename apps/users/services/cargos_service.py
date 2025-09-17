@@ -18,7 +18,7 @@ class CargosService:
     
     @classmethod
     def get_cargos(cls, rf: str, usuario_name: str) -> list[dict]:
-        """Busca cargos do usuário no sistema EOL"""
+        """ Busca cargos do usuário no sistema EOL """
 
         url = f"{env('SME_INTEGRACAO_URL', default='')}/Intranet/CarregarPerfisPorLogin/{rf}"
         
@@ -57,15 +57,7 @@ class CargosService:
     
     @classmethod
     def get_cargo_permitido(cls, cargos_data: dict) -> dict | None:
-        """
-        Extrai cargo permitido dos dados retornados
-        
-        Args:
-            cargos_data: Dados de cargos retornados pelo EOL
-            
-        Returns:
-            Cargo permitido ou None se não encontrado
-        """
+        """ Extrai cargo permitido dos dados retornados """
 
         # Prioriza cargos sobrepostos, senão usa cargos normais
         cargos_lista = cargos_data.get('cargosSobrePosto', cargos_data.get('cargos', []))
@@ -79,8 +71,7 @@ class CargosService:
                            if cargo.get('codigo') in (Cargo.DIRETOR_ESCOLA.value, Cargo.ASSISTENTE_DIRECAO.value)]
         
         if not cargos_permitidos:
-            logger.info("Nenhum cargo permitido encontrado. Cargos disponíveis: %s", 
-                       [c.get('codigo') for c in cargos_lista])
+            logger.info("Nenhum cargo permitido encontrado.")
             return None
         
         return cargos_permitidos[0]  # Retorna o primeiro cargo permitido
