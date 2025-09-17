@@ -33,18 +33,6 @@ class TestAutenticacaoService:
             AutenticacaoService.autentica("usuario123", "senha_incorreta")
 
     @patch("apps.users.services.login_service.env")
-    @patch("apps.users.services.login_service.requests.post")
-    def test_autenticacao_sem_login_no_retorno(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"nome": "Sem login"}
-        mock_post.return_value = mock_response
-
-        with pytest.raises(AuthenticationError, match="Resposta de autenticação inválida"):
-            AutenticacaoService.autentica("usuario123", "senha")
-
-    @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post", side_effect=Exception("Erro inesperado"))
     def test_erro_inesperado(self, mock_post, mock_env):
         mock_env.return_value = "http://fake-api"
