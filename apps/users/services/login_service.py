@@ -13,31 +13,20 @@ logger = logging.getLogger(__name__)
 
 class AutenticacaoService:
     """Serviço para autenticação de usuários no CoreSSO"""
-    
+
     DEFAULT_HEADERS = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Token {env("AUTENTICA_CORESSO_API_TOKEN", default="")}'
+        "accept": "application/json",
+        "x-api-eol-key": env("SME_INTEGRACAO_TOKEN", default=""),
+        "Content-Type": "application/json-patch+json"
     }
     DEFAULT_TIMEOUT = 10
     
     @classmethod
     def autentica(cls, login: str, senha: str) -> dict:
-        """
-        Autentica usuário no sistema CoreSSO
-        
-        Args:
-            login: Login do usuário
-            senha: Senha do usuário
-            
-        Returns:
-            Dict com dados do usuário autenticado
-            
-        Raises:
-            AuthenticationError: Quando credenciais são inválidas
-        """
+        """ Autentica usuário no sistema CoreSSO """
 
-        payload = {'login': login, 'senha': senha}
-        url = f"{env('AUTENTICA_CORESSO_API_URL', default='')}/autenticacao/"
+        payload = {"usuario": login, "senha": senha, "codigoSistema": env('CODIGO_SISTEMA_GIPE', default='')}
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/v1/autenticacao/externa"
         
         try:
             logger.info("Autenticando usuário no CoreSSO. Login: %s", login)
@@ -55,10 +44,6 @@ class AutenticacaoService:
                 raise AuthenticationError("Credenciais inválidas")
             
             response_data = response.json()
-            
-            if not response_data.get('login'):
-                logger.warning("Resposta de autenticação sem login válido: %s", login)
-                raise AuthenticationError("Resposta de autenticação inválida")
             
             logger.info("Usuário autenticado com sucesso: %s", login)
             return response_data
@@ -100,7 +85,6 @@ class AutenticacaoService:
                 "email": usuario.email,
                 "cpf": usuario.cpf,
                 "login": usuario.username,
-                "visoes": [],
                 "perfil_acesso": {
                     "codigo": usuario.cargo.codigo,
                     "nome": usuario.cargo.nome

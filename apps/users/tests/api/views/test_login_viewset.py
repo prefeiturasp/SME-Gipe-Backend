@@ -112,7 +112,7 @@ class TestLoginView:
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
-            "cpf": "12345678901",
+            "numeroDocumento": "12345678901",
             "email": "usuario@email.com"
         }
         cargo_data = {
@@ -120,7 +120,7 @@ class TestLoginView:
             "nome": "Cargo Teste"
         }
 
-        user = view.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+        user = view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
 
         assert user == mock_user
         mock_user.set_password.assert_called_once_with(senha)
@@ -142,7 +142,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
 
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
@@ -166,7 +166,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
 
         assert "Erro de integridade ao salvar os dados" in str(excinfo.value)
 
@@ -190,7 +190,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
 
         assert "Erro no banco de dados" in str(excinfo.value)
 
@@ -214,7 +214,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
 
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
