@@ -43,19 +43,19 @@ class TestSolicitar:
 class TestValidar:
 
     def test_validar_sucesso(self, user):
-
         email_request = AlteracaoEmail.objects.create(
             usuario=user,
             novo_email="novo@sme.prefeitura.sp.gov.br",
         )
 
-        usuario = AlteracaoEmailService.validar(email_request.token)
+        usuario, request = AlteracaoEmailService.validar(email_request.token)
 
+        assert usuario == user
+        assert request == email_request
         user.refresh_from_db()
-        email_request.refresh_from_db()
-
-        assert usuario.email == "novo@sme.prefeitura.sp.gov.br"
-        assert email_request.ja_usado is True
+        request.refresh_from_db()
+        assert user.email != "novo@sme.prefeitura.sp.gov.br"
+        assert request.ja_usado is False
 
     def test_validar_token_ja_usado(self, user):
 
