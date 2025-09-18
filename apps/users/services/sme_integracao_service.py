@@ -149,3 +149,49 @@ class SmeIntegracaoService:
             raise SmeIntegracaoException(
                 f"Erro ao criar o usuário {nome} no CoreSSO."
             ) from err
+        
+    @classmethod
+    def altera_email(cls, registro_funcional, email):
+        """
+        Altera o email de um usuário no sistema SME.
+        
+        Args:
+            registro_funcional: Username/registro funcional do usuário
+            email: Novo Email
+            
+        Returns:
+            Dict[str, Any]: Resposta da API ou confirmação de sucesso
+            
+        Raises:
+            SmeIntegracaoException: Em caso de erro na operação
+        """
+
+        if not registro_funcional or not email:
+            raise SmeIntegracaoException("Registro funcional e email são obrigatórios")
+        
+        logger.info(
+            "Iniciando alteração de email no CoreSSO para usuário: %s", 
+            registro_funcional
+        )
+        
+        data = {
+            'Usuario': registro_funcional,
+            'Email': email
+        }
+
+        try:
+
+            url = f"{env('SME_INTEGRACAO_URL', default='')}/AutenticacaoSgp/AlterarEmail"
+
+            response = requests.post(url, data=data, headers=cls.DEFAULT_HEADERS)
+
+            if response.status_code == status.HTTP_200_OK:
+                result = "OK"
+                return result
+            else:
+                texto = response.content.decode('utf-8')
+                mensagem = texto.strip("{}'\"")
+                logger.info("Erro ao Alterar email: %s", mensagem)
+                raise SmeIntegracaoException(mensagem)
+        except Exception as err:
+            raise SmeIntegracaoException(str(err))

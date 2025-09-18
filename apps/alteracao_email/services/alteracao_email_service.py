@@ -48,11 +48,5 @@ class AlteracaoEmailService:
         if email_request.criado_em < now() - timedelta(minutes=30):
             raise TokenExpiradoException("Token expirado.")
 
-        usuario.email = email_request.novo_email
-        usuario.save()
-
-        email_request.ja_usado = True
-        email_request.save()
-
         logger.info(f"E-mail alterado com sucesso: {usuario.email}")
-        return usuario
+        return usuario, email_request
