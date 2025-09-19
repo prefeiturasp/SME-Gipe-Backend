@@ -22,12 +22,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'username', 'password', 'name', 'email', 'cpf',
+            'username', 
+            'name', 'email', 'cpf',
             'cargo', 'unidades', 'rede'
         ]
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
 
     def is_valid(self, raise_exception=False):
         valid = super().is_valid(raise_exception=False)
