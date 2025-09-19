@@ -3,19 +3,18 @@ from rest_framework.exceptions import ValidationError
 from apps.users.api.serializers.login_serializer import LoginSerializer
 
 
-@pytest.mark.parametrize("username,expected_digits,auth_method", [
-    ("1234567", "1234567", "rf"),
-    ("12345678", "12345678", "rf"),
-    ("123.456.789-00", "12345678900", "cpf"),
-    ("123.456-78", "12345678", "rf"),
+@pytest.mark.parametrize("username,expected_digits", [
+    ("1234567", "1234567"),
+    ("12345678", "12345678"),
+    ("123.456.789-00", "12345678900"),
+    ("123.456-78", "12345678"),
 ])
 
-def test_valid_usernames(username, expected_digits, auth_method):
+def test_valid_usernames(username, expected_digits):
     data = {"username": username, "password": "secret"}
     serializer = LoginSerializer(data=data)
     assert serializer.is_valid()
     assert serializer.validated_data['username'] == expected_digits
-    assert serializer.validated_data['auth_method'] == auth_method
 
 @pytest.mark.parametrize("username", [
     "abc123",
