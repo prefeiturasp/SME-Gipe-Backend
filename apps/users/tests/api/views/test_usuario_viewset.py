@@ -30,7 +30,6 @@ def cargo():
 def valid_payload(unidade, cargo):
     return {
         "username": "usuarioapi",
-        "password": "senha123",
         "name": "Usuário API",
         "email": "api@sme.prefeitura.sp.gov.br",
         "cpf": "98765432100",
@@ -73,7 +72,6 @@ class TestUserCreateView:
 
         User.objects.create_user(
             username=valid_payload["username"],
-            password="senha123",
             name="Já existe",
             email="outro@sme.prefeitura.sp.gov.br",
             cpf="11122233344",
@@ -114,7 +112,6 @@ class TestUserUpdateView:
     def test_update_sucesso(self, client, django_user_model):
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
@@ -131,7 +128,6 @@ class TestUserUpdateView:
     def test_update_com_numero(self, client, django_user_model):
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
@@ -146,7 +142,6 @@ class TestUserUpdateView:
     def test_update_sem_sobrenome(self, client, django_user_model):
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
@@ -163,7 +158,6 @@ class TestUserUpdateView:
 
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
@@ -186,7 +180,6 @@ class TestUserUpdateView:
     def test_update_nome_em_branco(self, client, django_user_model):
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
@@ -201,7 +194,6 @@ class TestUserUpdateView:
     def test_internal_server_error_returns_500(self, client, django_user_model):
         user = django_user_model.objects.create_user(
             username="usuarioapi",
-            password="senha123",
             name="Nome Antigo"
         )
         client.force_authenticate(user=user)
