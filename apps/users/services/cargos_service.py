@@ -75,3 +75,15 @@ class CargosService:
             return None
         
         return cargos_permitidos[0]  # Retorna o primeiro cargo permitido
+    
+    @classmethod
+    def get_cargo_perfil_guide(cls, perfis: list) -> dict | None:
+        """ Retorna um dicionário com código e nome do cargo se o usuário tiver o perfil esperado """
+
+        perfil_esperado = env('PERFIL_INDIRETA_DIRETOR_DE_ESCOLA_GIPE', default='')
+        perfis_normalizados = [p.upper() for p in perfis]
+
+        if perfil_esperado in perfis_normalizados:
+            return {'codigo': 3360, 'nome': 'DIRETOR DE ESCOLA'}
+        
+        return None

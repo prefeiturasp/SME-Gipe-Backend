@@ -104,3 +104,24 @@ class TestCargosService:
         resultado = CargosService.get_cargo_permitido(dados)
 
         assert resultado["codigo"] == Cargo.DIRETOR_ESCOLA.value
+
+
+class TestCargosServiceGetCargoPerfilGuide:
+
+    @patch("apps.users.services.cargos_service.env")
+    def test_get_cargo_perfil_guide_com_perfil_esperado(self, mock_env):
+        mock_env.return_value = "DIRETOR DE ESCOLA"  # Valor do env esperado
+        perfis = ["diretor de escola", "outro perfil"]
+
+        resultado = CargosService.get_cargo_perfil_guide(perfis)
+
+        assert resultado == {'codigo': 3360, 'nome': 'DIRETOR DE ESCOLA'}
+
+    @patch("apps.users.services.cargos_service.env")
+    def test_get_cargo_perfil_guide_sem_perfil_esperado(self, mock_env):
+        mock_env.return_value = "DIRETOR DE ESCOLA"  # Valor do env esperado
+        perfis = ["professor", "coordenador"]
+
+        resultado = CargosService.get_cargo_perfil_guide(perfis)
+
+        assert resultado is None
