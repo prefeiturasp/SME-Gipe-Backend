@@ -15,5 +15,4 @@ class LoginSerializer(serializers.Serializer):
             })
 
         attrs['username'] = digits
-        attrs['auth_method'] = 'cpf' if len(digits) == 11 else 'rf'
         return attrs

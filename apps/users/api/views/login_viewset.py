@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError, DatabaseError
 
@@ -38,16 +39,11 @@ class LoginView(TokenObtainPairView):
 
         login = serializer.validated_data["username"]
         senha = serializer.validated_data["password"]
-        auth_method = serializer.validated_data["auth_method"]
         
         try:
-            if auth_method == "cpf":
-                user_data = self._authenticate_user_by_cpf(login, senha)
-
-            else:
-                auth_data = self._authenticate_user(login, senha)
-                cargo_autorizado = self._valida_cargo_permitido(login, auth_data)
-                user_data = self._build_user_response(login, senha, auth_data, cargo_autorizado)
+            auth_data = self._authenticate_user(login, senha)
+            cargo_autorizado = self._valida_cargo_permitido(login, auth_data)
+            user_data = self._build_user_response(login, senha, auth_data, cargo_autorizado)
             
             logger.info("Autenticação realizada com sucesso para usuário: %s", login)
             return Response(data=user_data, status=status.HTTP_200_OK)
@@ -76,10 +72,6 @@ class LoginView(TokenObtainPairView):
     def _authenticate_user(self, login: str, senha: str) -> dict:
         """Autentica usuário no CoreSSO"""
         return AutenticacaoService.autentica(login, senha)
-    
-    def _authenticate_user_by_cpf(self, login: str, senha: str) -> dict:
-        """Autentica usuário usando a Base Local"""
-        return AutenticacaoService._authenticate_user_by_cpf(login, senha)
 
     def _valida_cargo_permitido(self, rf: str, auth_data: dict) -> dict:
         """ Valida se o usuário possui um cargo autorizado para acesso ao sistema. """
@@ -92,11 +84,20 @@ class LoginView(TokenObtainPairView):
                 logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
                 return cargo_alternativo
             
+            perfis = auth_data.get('perfis')
+            if perfis and (perfil_autorizado := self._get_cargo_guide_indireta_parceira(perfis)):
+                logger.info("Usuário %s tem o perfil de Diretor de escola", rf)
+                return perfil_autorizado
+            
             logger.info("Cargo não permitido.")
-            raise UserNotFoundError("Acesso restrito a perfis específicos", usuario=auth_data['nome'].split(' ')[0])
+            raise UserNotFoundError("Acesso restrito a perfis específicos", usuario=auth_data.get('nome', 'Usuário').split(' ')[0])
 
         return cargo_permitido
-
+    
+    def _get_cargo_guide_indireta_parceira(self, perfis: list) -> dict | None:
+        """ Valida se o usuário tem perfil CoreSSO de Diretor de Escola """
+        return CargosService.get_cargo_perfil_guide(perfis)
+        
     def _get_cargo_gipe_ou_ponto_focal(self, rf: str) -> dict | None:
         """
         Retorna o cargo se o usuário for GIPE ou PONTO FOCAL DRE, senão None
@@ -144,6 +145,9 @@ class LoginView(TokenObtainPairView):
                 )
 
                 user.set_password(senha)
+                user.is_validado = True
+                user.is_core_sso = True
+                user.last_login = timezone.now()
                 user.save()
 
                 return user
