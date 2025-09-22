@@ -1,4 +1,6 @@
 import re
+import environ
+
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -6,6 +8,8 @@ from django.contrib.auth import get_user_model
 from apps.unidades.models.unidades import Unidade
 
 User = get_user_model()
+env = environ.Env()
+BASE_CORESSO_AUTH = env("BASE_CORESSO_AUTH")
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -72,7 +76,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         unidades = validated_data.pop('unidades', [])
         validated_data['is_validado'] = False
-        user = User.objects.create_user(**validated_data)
+
+        username = validated_data.get("username")
+        senha_padrao = f"{BASE_CORESSO_AUTH}{username[-4:]}"
+        
+        user = User.objects.create_user(password=senha_padrao, **validated_data)
         user.unidades.set(unidades)
         
         return user
