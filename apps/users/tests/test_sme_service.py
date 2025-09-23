@@ -166,3 +166,38 @@ class TestAlteraEmail:
 
         assert "Falha de rede" in str(exc.value)
         mock_post.assert_called_once()
+
+
+@patch("apps.users.services.sme_integracao_service.requests.get")
+class TestAtribuirPerfilCoresso:
+
+    def test_sucesso(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = status.HTTP_200_OK
+        mock_get.return_value = mock_response
+
+        result = SmeIntegracaoService.atribuir_perfil_coresso("1234567")
+
+        assert result is None
+        mock_get.assert_called_once()
+
+    def test_erro_api(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "Erro ao atribuir perfil"
+        mock_get.return_value = mock_response
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.atribuir_perfil_coresso("1234567")
+
+        assert "Falha ao fazer atribuição de perfil" in str(exc.value)
+        mock_get.assert_called_once()
+
+    def test_excecao_generica(self, mock_get):
+        mock_get.side_effect = requests.RequestException("Falha de rede")
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.atribuir_perfil_coresso("1234567")
+
+        assert "Falha de rede" in str(exc.value)
+        mock_get.assert_called_once()
