@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.urls import reverse
 from types import SimpleNamespace
 from django import forms
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
 from apps.users.models import User, Cargo
 from apps.users.admin import (
@@ -236,18 +236,20 @@ class TestEnviarParaCoreSSOAction:
         assert response.status_code == 200
         assert any("confirm_enviar_core_sso.html" in name for name in template_names)
 
-    @patch("apps.users.admin.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-    def test_action_with_valid_users(self, mock_cria_core_sso, admin_client, cargo):
-        mock_cria_core_sso.return_value = None
+    @patch("apps.users.services.envia_email_service.EnviaEmailService.enviar", return_value=None)
+    @patch("apps.users.admin.CriaUsuarioCoreSSOService.cria_usuario_core_sso", return_value=None)
+    def test_action_with_valid_users(self, mock_cria_core_sso, mock_enviar_email, admin_client, cargo):
         user = User.objects.create_user(
             username="user_valid",
             name="User Valid",
             cpf="12345678902",
+            email="valid@exemplo.com",
             cargo=cargo,
             rede=TipoGestaoChoices.INDIRETA,
             password="Test1234@",
             is_validado=True,
         )
+
         url = reverse("admin:users_user_changelist")
         data = {
             "action": "enviar_para_core_sso",
@@ -260,6 +262,17 @@ class TestEnviarParaCoreSSOAction:
 
         assert response.status_code == 200
         assert any("usuário(s) registrado(s) com sucesso no CoreSSO!" in m for m in messages)
+
+        mock_enviar_email.assert_called_once_with(
+            destinatario=user.email,
+            assunto="Seu acesso ao GIPE foi aprovado!",
+            template_html="emails/cadastro_aprovado.html",
+            contexto={
+                "nome_usuario": user.name,
+                "aplicacao_url": ANY,
+                "senha": ANY,
+            },
+        )
 
     def test_action_with_invalid_users(self, admin_client, cargo):
         user = User.objects.create_user(
@@ -283,31 +296,42 @@ class TestEnviarParaCoreSSOAction:
         assert response.status_code == 200
         assert any("usuário(s). É necessário cumprir todos os requisitos." in str(m) for m in response.context["messages"])
 
+    @patch("apps.users.services.envia_email_service.EnviaEmailService.enviar", return_value=None)
     @patch("apps.users.admin.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-    def test_action_with_mixed_users(self, mock_cria_core_sso, admin_client, cargo):
-        mock_cria_core_sso.return_value = None
-        valid_user = User.objects.create_user(
-            username="user_valid_mixed",
+    def test_action_with_mixed_users(self, mock_cria_core_sso, mock_enviar_email, admin_client, cargo):
+        def side_effect(dados_usuario):
+            if dados_usuario["login"] == "user_valid":
+                return None
+            raise CargaUsuarioException("Erro no CoreSSO")
+
+        mock_cria_core_sso.side_effect = side_effect
+
+        user_valid = User.objects.create_user(
+            username="user_valid",
             name="User Valid",
-            cpf="12345678904",
+            cpf="12345678902",
+            email="valid@exemplo.com",
             cargo=cargo,
             rede=TipoGestaoChoices.INDIRETA,
             password="Test1234@",
             is_validado=True,
         )
-        invalid_user = User.objects.create_user(
-            username="user_invalid_mixed",
+
+        user_invalid = User.objects.create_user(
+            username="user_invalid",
             name="User Invalid",
-            cpf="12345678905",
+            cpf="12345678903",
+            email="invalid@exemplo.com",
             cargo=cargo,
-            rede=TipoGestaoChoices.DIRETA,
+            rede=TipoGestaoChoices.INDIRETA,
             password="Test1234@",
-            is_validado=False,
+            is_validado=True,
         )
+
         url = reverse("admin:users_user_changelist")
         data = {
             "action": "enviar_para_core_sso",
-            "_selected_action": [valid_user.pk, invalid_user.pk],
+            "_selected_action": [user_valid.pk, user_invalid.pk],
             "confirm": "yes",
         }
 
@@ -316,7 +340,18 @@ class TestEnviarParaCoreSSOAction:
 
         assert response.status_code == 200
         assert any("usuário(s) registrado(s) com sucesso no CoreSSO!" in m for m in messages)
-        assert any("usuário(s). É necessário cumprir todos os requisitos." in m for m in messages)
+        assert any("user_invalid: Erro no CoreSSO" in m for m in messages)
+
+        mock_enviar_email.assert_called_once_with(
+            destinatario=user_valid.email,
+            assunto="Seu acesso ao GIPE foi aprovado!",
+            template_html="emails/cadastro_aprovado.html",
+            contexto={
+                "nome_usuario": user_valid.name,
+                "aplicacao_url": ANY,
+                "senha": ANY,
+            },
+        )
     
     @patch("apps.users.admin.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
     def test_action_gera_erro_carga_usuario_exception(self, mock_cria_core_sso, admin_client, cargo):

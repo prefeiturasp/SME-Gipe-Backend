@@ -1,3 +1,5 @@
+import environ
+
 from django import forms
 from django.shortcuts import render
 from django.contrib import admin, messages
@@ -10,8 +12,12 @@ from .models import User, Cargo
 from apps.unidades.models.unidades import TipoGestaoChoices
 from apps.helpers.exceptions import CargaUsuarioException
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
+from apps.users.services.envia_email_service import EnviaEmailService
+
 
 User = get_user_model()
+env = environ.Env()
+
 
 
 class CustomAdminPasswordChangeForm(AdminPasswordChangeForm):
@@ -146,6 +152,19 @@ class UserAdmin(BaseUserAdmin):
                 try:
                     CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario)
                     enviados += 1
+
+                    contexto_email = {
+                        "nome_usuario": usuario.name,
+                        "aplicacao_url": env("FRONTEND_URL"),
+                        "senha": f"{env("BASE_CORESSO_AUTH")}"
+                    }
+
+                    EnviaEmailService.enviar(
+                        destinatario=usuario.email,
+                        assunto="Seu acesso ao GIPE foi aprovado!",
+                        template_html="emails/cadastro_aprovado.html",
+                        contexto=contexto_email,
+                    )
                     
                 except CargaUsuarioException as e:
                     erros += 1
