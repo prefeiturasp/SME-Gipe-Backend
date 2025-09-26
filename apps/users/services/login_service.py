@@ -13,31 +13,20 @@ logger = logging.getLogger(__name__)
 
 class AutenticacaoService:
     """Serviço para autenticação de usuários no CoreSSO"""
-    
+
     DEFAULT_HEADERS = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Token {env("AUTENTICA_CORESSO_API_TOKEN", default="")}'
+        "accept": "application/json",
+        "x-api-eol-key": env("SME_INTEGRACAO_TOKEN", default=""),
+        "Content-Type": "application/json-patch+json"
     }
     DEFAULT_TIMEOUT = 10
     
     @classmethod
     def autentica(cls, login: str, senha: str) -> dict:
-        """
-        Autentica usuário no sistema CoreSSO
-        
-        Args:
-            login: Login do usuário
-            senha: Senha do usuário
-            
-        Returns:
-            Dict com dados do usuário autenticado
-            
-        Raises:
-            AuthenticationError: Quando credenciais são inválidas
-        """
+        """ Autentica usuário no sistema CoreSSO """
 
-        payload = {'login': login, 'senha': senha}
-        url = f"{env('AUTENTICA_CORESSO_API_URL', default='')}/autenticacao/"
+        payload = {"usuario": login, "senha": senha, "codigoSistema": env('CODIGO_SISTEMA_GIPE', default='')}
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/v1/autenticacao/externa"
         
         try:
             logger.info("Autenticando usuário no CoreSSO. Login: %s", login)
@@ -56,10 +45,6 @@ class AutenticacaoService:
             
             response_data = response.json()
             
-            if not response_data.get('login'):
-                logger.warning("Resposta de autenticação sem login válido: %s", login)
-                raise AuthenticationError("Resposta de autenticação inválida")
-            
             logger.info("Usuário autenticado com sucesso: %s", login)
             return response_data
             
@@ -70,58 +55,3 @@ class AutenticacaoService:
         except Exception as e:
             logger.error("Erro inesperado na autenticação: %s", str(e))
             raise AuthenticationError(f"Erro interno: {str(e)}")
-        
-    @classmethod
-    def _authenticate_user_by_cpf(cls, cpf: str, senha: str) -> dict:
-        """
-        Autentica o usuário utilizando o CPF diretamente do banco de dados.
-        """
-
-        try:
-            usuario = User.objects.get(cpf=cpf)
-
-            if not usuario.check_password(senha):
-                logger.warning("Senha incorreta para o CPF informado: %s", cpf)
-                raise AuthenticationError("Senha inválida.")
-            
-            if usuario.rede != "INDIRETA" or not usuario.is_validado:
-                logger.warning("Usuário com CPF %s não pertence à rede INDIRETA ou PARCEIRA", cpf)
-                raise UserNotFoundError("Acesso restrito a usuários da rede INDIRETA ou PARCEIRA.", usuario=usuario.name)
-
-            logger.info("Usuário autenticado com sucesso via CPF: %s", cpf)
-
-            usuario.last_login = timezone.now()
-            usuario.save()
-
-            token = RefreshToken.for_user(usuario)
-
-            return {
-                "name": usuario.name,
-                "email": usuario.email,
-                "cpf": usuario.cpf,
-                "login": usuario.username,
-                "visoes": [],
-                "perfil_acesso": {
-                    "codigo": usuario.cargo.codigo,
-                    "nome": usuario.cargo.nome
-                },
-                "unidade_lotacao": [
-                    {"codigo": u["codigo_eol"], "nomeUnidade": u["nome"]}
-                    for u in usuario.unidades.all().values("codigo_eol", "nome")
-                ] if usuario.unidades.exists() else [],
-                "token": str(token.access_token)
-            }
-
-        except User.DoesNotExist:
-            logger.warning("Usuário com CPF %s não encontrado", cpf)
-            raise AuthenticationError("Usuário não encontrado.")
-        
-        except AuthenticationError:
-            raise
-
-        except UserNotFoundError:
-            raise 
-
-        except Exception as e:
-            logger.error("Erro interno na autenticação via CPF: %s", str(e))
-            raise InternalError("Erro interno ao autenticar via CPF.")

@@ -149,3 +149,72 @@ class SmeIntegracaoService:
             raise SmeIntegracaoException(
                 f"Erro ao criar o usuário {nome} no CoreSSO."
             ) from err
+        
+    @classmethod
+    def altera_email(cls, registro_funcional, email):
+        """
+        Altera o email de um usuário no sistema SME.
+        
+        Args:
+            registro_funcional: Username/registro funcional do usuário
+            email: Novo Email
+            
+        Returns:
+            Dict[str, Any]: Resposta da API ou confirmação de sucesso
+            
+        Raises:
+            SmeIntegracaoException: Em caso de erro na operação
+        """
+
+        if not registro_funcional or not email:
+            raise SmeIntegracaoException("Registro funcional e email são obrigatórios")
+        
+        logger.info(
+            "Iniciando alteração de email no CoreSSO para usuário: %s", 
+            registro_funcional
+        )
+        
+        data = {
+            'Usuario': registro_funcional,
+            'Email': email
+        }
+
+        try:
+
+            url = f"{env('SME_INTEGRACAO_URL', default='')}/AutenticacaoSgp/AlterarEmail"
+
+            response = requests.post(url, data=data, headers=cls.DEFAULT_HEADERS)
+
+            if response.status_code == status.HTTP_200_OK:
+                result = "OK"
+                return result
+            else:
+                texto = response.content.decode('utf-8')
+                mensagem = texto.strip("{}'\"")
+                logger.info("Erro ao Alterar email: %s", mensagem)
+                raise SmeIntegracaoException(mensagem)
+        except Exception as err:
+            raise SmeIntegracaoException(str(err))
+        
+    @classmethod
+    def atribuir_perfil_coresso(cls, login: str) -> None:
+        """ Atribui o perfil guide ao usuário no CoreSSO. """
+
+        logger.info("Iniciando atribuição de perfil guide para o login: %s", login)
+
+        perfil_guide = env('PERFIL_INDIRETA_DIRETOR_DE_ESCOLA_GIPE', default='')
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/perfis/servidores/{login}/perfil/{perfil_guide}/atribuirPerfil"
+
+        try:
+            response = requests.get(url, headers=cls.DEFAULT_HEADERS, timeout=cls.DEFAULT_TIMEOUT)
+
+            if response.status_code == status.HTTP_200_OK:
+                logger.info("Perfil atribuído com sucesso ao login: %s", login)
+                return
+
+            logger.error("Falha na atribuição de perfil para %s. Status: %s, Resposta: %s", login, response.status_code, response.text)
+            raise SmeIntegracaoException("Falha ao fazer atribuição de perfil.")
+
+        except Exception as err:
+            logger.exception("Erro inesperado ao atribuir perfil para %s: %s", login, err)
+            raise SmeIntegracaoException(str(err))
