@@ -134,21 +134,25 @@ class LoginView(TokenObtainPairView):
                 )
 
                 # Criação/atualização do usuário com o cargo
-                user, _ = User.objects.update_or_create(
-                    username=login,
-                    defaults={
+                dict_user = {
                         'name': auth_data['nome'],
                         'cpf': auth_data['numeroDocumento'],
                         'email': auth_data['email'],
-                        'cargo': cargo
+                        'cargo': cargo,
+                        'is_validado': True,
+                        'is_core_sso':True,
+                        'last_login': timezone.now(),
                     }
-                )
+                
+                user = User.objects.get(username=login)
 
-                user.set_password(senha)
-                user.is_validado = True
-                user.is_core_sso = True
-                user.last_login = timezone.now()
-                user.save()
+                if not user.check_password(senha):
+                    dict_user.update({'password': senha})
+
+                user, _ = User.objects.update_or_create(
+                    username=login,
+                    defaults=dict_user
+                )
 
                 return user
 
