@@ -172,9 +172,23 @@ class LoginView(TokenObtainPairView):
         """Gera tokens JWT para o usuário"""
 
         refresh = RefreshToken.for_user(user)
+
+        refresh["username"] = user.username
+        refresh["name"] = getattr(user, "name", "") or ""
+        if getattr(user, "cargo", None):
+            refresh["perfil_codigo"] = user.cargo.codigo
+            refresh["perfil_nome"] = user.cargo.nome
+
+        access = refresh.access_token
+        access["username"] = user.username
+        access["name"] = getattr(user, "name", "") or ""
+        if getattr(user, "cargo", None):
+            access["perfil_codigo"] = user.cargo.codigo
+            access["perfil_nome"] = user.cargo.nome
+
         return {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            "access": str(access),
+            "refresh": str(refresh),
         }
     
     def _build_user_response(self, login: str, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:

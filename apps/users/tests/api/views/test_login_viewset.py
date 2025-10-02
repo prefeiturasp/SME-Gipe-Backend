@@ -227,15 +227,37 @@ class TestLoginView:
         view = LoginView()
 
         mock_user = MagicMock()
-        mock_refresh = MagicMock()
-        mock_refresh.access_token = "access-token"
-        mock_refresh.__str__.return_value = "refresh-token"
+        mock_user.username = "testeuser"
+        mock_user.name = "Teste Usuário"
 
-        with patch('apps.users.api.views.login_viewset.RefreshToken.for_user', return_value=mock_refresh) as mock_for_user:
+        mock_cargo = MagicMock()
+        mock_cargo.codigo = 123
+        mock_cargo.nome = "Coordenador"
+        mock_user.cargo = mock_cargo
+
+        mock_refresh = {}
+        mock_refresh_obj = MagicMock(spec=dict)
+        mock_refresh_obj.__setitem__.side_effect = mock_refresh.__setitem__
+        mock_refresh_obj.__getitem__.side_effect = mock_refresh.__getitem__
+        mock_refresh_obj.__str__.return_value = "refresh-token"
+
+        mock_access = {}
+        mock_access_obj = MagicMock(spec=dict)
+        mock_access_obj.__setitem__.side_effect = mock_access.__setitem__
+        mock_access_obj.__getitem__.side_effect = mock_access.__getitem__
+        mock_access_obj.__str__.return_value = "access-token"
+
+        mock_refresh_obj.access_token = mock_access_obj
+
+        with patch('apps.users.api.views.login_viewset.RefreshToken.for_user', return_value=mock_refresh_obj):
             tokens = view._generate_token(mock_user)
 
         assert tokens == {'access': 'access-token', 'refresh': 'refresh-token'}
-        mock_for_user.assert_called_once_with(mock_user)
+
+        assert mock_refresh["perfil_codigo"] == 123
+        assert mock_refresh["perfil_nome"] == "Coordenador"
+        assert mock_access["perfil_codigo"] == 123
+        assert mock_access["perfil_nome"] == "Coordenador"
 
     @patch("apps.users.services.login_service.AutenticacaoService.autentica")
     @patch("apps.users.services.cargos_service.CargosService.get_cargos")
