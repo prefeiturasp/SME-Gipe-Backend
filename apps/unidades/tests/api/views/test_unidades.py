@@ -106,12 +106,12 @@ class TestUnidadeViewSet:
 
     def test_verificar_unidade_pertence_usuario(self, api_client, usuario, ue_indireta):
         api_client.force_authenticate(user=usuario)
-        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/verificar_unidade/")
+        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/verificar-unidade/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == "A unidade pertence ao usuário."
 
     def test_verificar_unidade_nao_pertence_usuario(self, api_client, usuario, ue_direta):
         api_client.force_authenticate(user=usuario)
-        response = api_client.get(f"/api/unidades/{ue_direta.pk}/verificar_unidade/")
+        response = api_client.get(f"/api/unidades/{ue_direta.pk}/verificar-unidade/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.data["detail"] == "A unidade não pertence ao usuário."
