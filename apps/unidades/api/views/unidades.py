@@ -87,7 +87,7 @@ class UnidadeViewSet(ModelViewSet):
     def _resposta_erro(self, mensagem, status_code):
         return Response({"detail": mensagem}, status=status_code)
     
-    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], url_path="verificar-unidade")
     def verificar_unidade(self, request, pk=None):
         """ Verifica se a unidade pertence ao usuário autenticado """
         
