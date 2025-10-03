@@ -37,17 +37,35 @@ class UserMeSerializer(serializers.ModelSerializer):
         }
 
     def get_unidades(self, obj):
-        # `values` evita instanciar objetos inteiros e mantém ordem previsível
-        data = obj.unidades.all().values(
-            "codigo_eol", "nome", "sigla", "dre__codigo_eol"
-        )
-        # renomeia a chave do values() para manter a saída consistente
-        return [
-            {
-                "codigo_eol": u["codigo_eol"],
-                "nome": u["nome"],
-                "sigla": u["sigla"],
-                "dre_codigo_eol": u["dre__codigo_eol"],
-            }
-            for u in data
-        ]
+        unidades = obj.unidades.select_related("dre").all()
+        resultado = []
+
+        for u in unidades:
+            if u.tipo_unidade == "DRE":
+                resultado.append({
+                    "ue": {
+                        "codigo_eol": None,
+                        "nome": None,
+                        "sigla": None,
+                    },
+                    "dre": {
+                        "codigo_eol": u.codigo_eol,
+                        "nome": u.nome,
+                        "sigla": u.sigla,
+                    }
+                })
+            else:
+                resultado.append({
+                    "ue": {
+                        "codigo_eol": u.codigo_eol,
+                        "nome": u.nome,
+                        "sigla": u.sigla,
+                    },
+                    "dre": {
+                        "codigo_eol": u.dre.codigo_eol if u.dre else None,
+                        "nome": u.dre.nome if u.dre else None,
+                        "sigla": u.dre.sigla if u.dre else None,
+                    }
+                })
+                
+        return resultado
