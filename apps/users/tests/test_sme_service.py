@@ -201,3 +201,50 @@ class TestAtribuirPerfilCoresso:
 
         assert "Falha de rede" in str(exc.value)
         mock_get.assert_called_once()
+
+
+@patch("apps.users.services.sme_integracao_service.requests.delete")
+class TestRemoverPerfilUsuarioCoreSSO:
+
+    def test_sucesso(self, mock_delete):
+        """Deve retornar None quando a API responde 200"""
+        mock_response = MagicMock()
+        mock_response.status_code = status.HTTP_200_OK
+        mock_delete.return_value = mock_response
+
+        result = SmeIntegracaoService.remover_perfil_coresso(
+            login="1234567"
+        )
+
+        assert result is None
+        mock_delete.assert_called_once()
+        args, kwargs = mock_delete.call_args
+        assert "data" in kwargs
+        assert kwargs["data"]["codigoRF"] == "1234567"
+        assert "perfilGuid" in kwargs["data"]
+
+    def test_erro_api(self, mock_post):
+        """Deve lançar exceção se a API retornar status != 200"""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "Erro ao remover perfil"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.remover_perfil_coresso(
+                login="1234567"            )
+
+        assert "Falha ao fazer remoção de perfil." in str(exc.value)
+        mock_post.assert_called_once()
+
+    def test_excecao_generica(self, mock_delete):
+        """Deve encapsular exceções inesperadas em SmeIntegracaoException"""
+        mock_delete.side_effect = requests.RequestException("Falha de rede")
+
+        with pytest.raises(SmeIntegracaoException) as exc:
+            SmeIntegracaoService.remover_perfil_coresso(
+                login="1234567"
+            )
+
+        assert "Falha de rede" in str(exc.value)
+        mock_delete.assert_called_once()
