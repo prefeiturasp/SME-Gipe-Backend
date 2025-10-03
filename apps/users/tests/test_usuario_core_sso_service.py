@@ -148,3 +148,62 @@ class TestCriaUsuarioCoreSSOService:
         with patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.atribuir_perfil_coresso") as mock_atribuir:
             CriaUsuarioCoreSSOService._adiciona_perfil_guide_core_sso(dados_usuario_validos["login"])
             mock_atribuir.assert_called_once_with(login=dados_usuario_validos["login"])
+
+@pytest.mark.django_db
+class TestRemoverPerfilUsuarioCoreSSO:
+
+    @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.remover_perfil_coresso")
+    @patch("apps.users.services.usuario_core_sso_service.CriaUsuarioCoreSSOService._remover_flags_core_sso")
+    def test_remover_perfil_usuario_sucesso(self, mock_remover_flags, mock_remover_perfil, usuario_local):
+        """Testa remoção bem-sucedida do perfil do usuário"""
+        login = usuario_local.username
+
+        CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso(login)
+
+        mock_remover_perfil.assert_called_once_with(login=login)
+        mock_remover_flags.assert_called_once_with(login=login)
+
+    @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.remover_perfil_coresso")
+    def test_remover_perfil_timeout_error(self, mock_remover_perfil, usuario_local):
+        """Testa tratamento de erro de timeout"""
+        mock_remover_perfil.side_effect = ReadTimeout
+
+        with pytest.raises(CargaUsuarioException):
+            CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso(usuario_local.username)
+
+    @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.remover_perfil_coresso")
+    def test_remover_perfil_erro_integracao(self, mock_remover_perfil, usuario_local):
+        """Testa tratamento de erro do serviço de integração"""
+        mock_remover_perfil.side_effect = SmeIntegracaoException("Erro CoreSSO")
+
+        with pytest.raises(CargaUsuarioException):
+            CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso(usuario_local.username)
+
+    @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.remover_perfil_coresso")
+    def test_remover_perfil_erro_inesperado(self, mock_remover_perfil, usuario_local):
+        """Testa tratamento de erro inesperado"""
+        mock_remover_perfil.side_effect = Exception("Erro inesperado")
+
+        with pytest.raises(CargaUsuarioException):
+            CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso(usuario_local.username)
+
+
+@pytest.mark.django_db
+class TestRemoverFlagsCoreSSO:
+
+    def test_remover_flags_sucesso(self, usuario_local):
+        """Testa remoção bem-sucedida das flags"""
+        usuario_local.is_core_sso = True
+        usuario_local.is_validado = True
+        usuario_local.save()
+
+        CriaUsuarioCoreSSOService._remover_flags_core_sso(usuario_local.username)
+
+        usuario_local.refresh_from_db()
+        assert usuario_local.is_core_sso is False
+        assert usuario_local.is_validado is False
+
+    def test_remover_flags_usuario_nao_encontrado(self):
+        """Testa usuário não encontrado"""
+        with pytest.raises(CargaUsuarioException):
+            CriaUsuarioCoreSSOService._remover_flags_core_sso("00000000000")
