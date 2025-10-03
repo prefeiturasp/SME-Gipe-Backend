@@ -51,6 +51,39 @@ class CriaUsuarioCoreSSOService:
             raise CargaUsuarioException(f"Erro inesperado: {str(e)}")
 
     @classmethod
+    def remover_perfil_usuario_core_sso(cls, login: str) -> None:
+        """
+        Remove o perfil do usuário no CoreSSO e atualiza flags locais.
+        O usuário continua existindo no CoreSSO, apenas sem o perfil.
+        """
+
+        try:
+            SmeIntegracaoService.remover_perfil_coresso(
+                login=login,
+            )
+
+            cls._remover_flags_core_sso(login=login)
+
+            logger.info(
+                "Perfil removido no CoreSSO e flags atualizadas para usuário %s.",
+                login
+            )
+
+        except (ReadTimeout, ConnectTimeout) as e:
+            raise CargaUsuarioException(
+                f"Erro de {type(e).__name__} ao remover perfil do usuário {login} no CoreSSO."
+            )
+
+        except SmeIntegracaoException as e:
+            raise CargaUsuarioException(
+                f"Erro {str(e)} ao remover perfil do usuário {login} no CoreSSO."
+            )
+
+        except Exception as e:
+            logger.exception("Erro inesperado ao remover perfil do usuário %s", login)
+            raise CargaUsuarioException(f"Erro inesperado: {str(e)}")
+        
+    @classmethod
     def _usuario_existe(cls, login: str) -> dict | None:
         """ Consulta usuário existe no CoreSSO """
         return SmeIntegracaoService.usuario_core_sso_or_none(login=login)
@@ -65,6 +98,19 @@ class CriaUsuarioCoreSSOService:
             user.save()
         except User.DoesNotExist:
             logger.warning("Usuário com CPF %s não encontrado", login)
+            raise CargaUsuarioException(f"Usuário {login} não encontrado.")
+        
+    @classmethod
+    def _remover_flags_core_sso(cls, login: str) -> None:
+        """ Marca usuário como não validado e fora do CoreSSO no DB local. """
+
+        try:
+            user = User.objects.get(username=login)
+            user.is_core_sso = False
+            user.is_validado = False
+            user.save(update_fields=["is_core_sso", "is_validado"])
+        except User.DoesNotExist:
+            logger.warning("Usuário com CPF %s não encontrado ao tentar remover", login)
             raise CargaUsuarioException(f"Usuário {login} não encontrado.")
         
     @classmethod

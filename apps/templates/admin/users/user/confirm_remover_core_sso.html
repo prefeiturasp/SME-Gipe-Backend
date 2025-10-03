@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+  <div id="content-main">
+
+    <p>
+      Após a confirmação, esta ação 
+      <strong>não poderá ser desfeita</strong>.
+    </p>
+
+    <div class="requirements">
+      <h2>Requisitos obrigatórios para a remoção:</h2>
+      <ul>
+        <li>Os perfis selecionados devem ser de <strong>redes parceiras ou indiretas</strong></li>
+      </ul>
+    </div>
+
+    <p><strong>Tem certeza que deseja continuar?</strong></p>
+
+    <form action="" method="post">
+      {% csrf_token %}
+      {% for obj in queryset %}
+        <input type="hidden" name="_selected_action" value="{{ obj.pk }}">
+      {% endfor %}
+      <input type="hidden" name="action" value="{{ action }}">
+      <input type="hidden" name="confirm" value="yes">
+
+      <div class="submit-row" style="display: flex; gap: 10px;">
+        <button type="submit" class="button default">
+          {% trans "Confirmar" %}
+        </button>
+        <a href="{{ request.META.HTTP_REFERER|default:'../' }}" class="button cancel-link">
+          {% trans "Cancelar" %}
+        </a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
