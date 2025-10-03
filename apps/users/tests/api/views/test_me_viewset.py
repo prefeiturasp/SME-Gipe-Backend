@@ -82,12 +82,27 @@ class TestMeView:
         user = user_with_unidade
         api_client.force_authenticate(user=user)
         response = api_client.get("/api/users/me")
+
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["perfil_acesso"] == {"codigo": user.cargo.codigo, "nome": user.cargo.nome}
+        assert response.data["perfil_acesso"] == {
+            "codigo": user.cargo.codigo,
+            "nome": user.cargo.nome,
+        }
         assert len(response.data["unidades"]) == 1
         unidade_data = response.data["unidades"][0]
-        assert unidade_data["codigo_eol"] == unidade.codigo_eol
-        assert unidade_data["dre_codigo_eol"] == unidade.dre.codigo_eol
+
+        assert unidade_data["ue"]["codigo_eol"] == unidade.codigo_eol
+        assert unidade_data["ue"]["nome"] == unidade.nome
+        assert unidade_data["ue"]["sigla"] == unidade.sigla
+
+        if unidade.dre:
+            assert unidade_data["dre"]["codigo_eol"] == unidade.dre.codigo_eol
+            assert unidade_data["dre"]["nome"] == unidade.dre.nome
+            assert unidade_data["dre"]["sigla"] == unidade.dre.sigla
+        else:
+            assert unidade_data["dre"]["codigo_eol"] is None
+            assert unidade_data["dre"]["nome"] is None
+            assert unidade_data["dre"]["sigla"] is None
 
     def test_get_unauthenticated_user_api_client(self, api_client):
         response = api_client.get("/api/users/me")

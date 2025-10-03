@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 
 from apps.users.models import Cargo
 from apps.unidades.models.unidades import Unidade, TipoGestaoChoices, TipoUnidadeChoices
-from apps.users.api.serializers.me_serializer import UnidadeMiniSerializer, UserMeSerializer
+from apps.users.api.serializers.me_serializer import UserMeSerializer
 
 User = get_user_model()
 
@@ -44,35 +44,6 @@ def ue_direta(db, dre):
 
 
 @pytest.mark.django_db
-class TestUnidadeMiniSerializer:
-
-    def test_serializa_unidade_com_dre(self, dre, ue_indireta):
-        serializer = UnidadeMiniSerializer(ue_indireta)
-        data = serializer.data
-
-        assert data["codigo_eol"] == ue_indireta.codigo_eol
-        assert data["nome"] == ue_indireta.nome
-        assert data["sigla"] == ue_indireta.sigla
-        assert data["dre_codigo_eol"] == dre.codigo_eol
-
-    def test_serializa_unidade_sem_dre(self):
-        unidade = Unidade.objects.create(
-            codigo_eol="999999",
-            nome="Unidade Sem DRE",
-            sigla="USD",
-            tipo_unidade=TipoUnidadeChoices.CEI,
-            rede=TipoGestaoChoices.DIRETA,
-        )
-        serializer = UnidadeMiniSerializer(unidade)
-        data = serializer.data
-
-        assert data["codigo_eol"] == "999999"
-        assert data["nome"] == "Unidade Sem DRE"
-        assert data["sigla"] == "USD"
-        assert data["dre_codigo_eol"] is None
-
-
-@pytest.mark.django_db
 class TestUserMeSerializer:
 
     def test_user_com_cargo(self):
@@ -94,7 +65,7 @@ class TestUserMeSerializer:
     def test_user_sem_cargo_mockado(self):
         user = MagicMock()
         user.cargo = None
-        user.unidades.all.return_value.values.return_value = []
+        user.unidades.select_related.return_value.all.return_value = []
 
         data = UserMeSerializer(user).data
         assert data["perfil_acesso"] is None
@@ -115,9 +86,20 @@ class TestUserMeSerializer:
         user.save()
 
         data = UserMeSerializer(user).data
-        nomes = [u["nome"] for u in data["unidades"]]
-        assert "UE Indireta" in nomes
-        assert "UE Direta" in nomes
+
+        ue = next(u for u in data["unidades"] if u["ue"]["codigo_eol"] == ue_indireta.codigo_eol)
+        assert ue["ue"]["nome"] == ue_indireta.nome
+        assert ue["ue"]["sigla"] == ue_indireta.sigla
+        assert ue["dre"]["codigo_eol"] == dre.codigo_eol
+        assert ue["dre"]["nome"] == dre.nome
+        assert ue["dre"]["sigla"] == dre.sigla
+
+        ue = next(u for u in data["unidades"] if u["ue"]["codigo_eol"] == ue_direta.codigo_eol)
+        assert ue["ue"]["nome"] == ue_direta.nome
+        assert ue["ue"]["sigla"] == ue_direta.sigla
+        assert ue["dre"]["codigo_eol"] == dre.codigo_eol
+        assert ue["dre"]["nome"] == dre.nome
+        assert ue["dre"]["sigla"] == dre.sigla
 
     def test_user_sem_unidades(self):
         cargo = Cargo.objects.create(codigo=30, nome="Coordenador")
@@ -133,3 +115,32 @@ class TestUserMeSerializer:
 
         data = UserMeSerializer(user).data
         assert data["unidades"] == []
+
+
+    def test_user_com_unidade_dre(self, dre):
+        cargo = Cargo.objects.create(codigo=40, nome="Supervisor")
+        user = User.objects.create_user(
+            username="usuario5",
+            password="teste123",
+            name="Usuário DRE",
+            email="dre@email.com",
+            cpf="77777777777",
+            rede=TipoGestaoChoices.INDIRETA,
+            cargo=cargo
+        )
+
+        user.unidades.add(dre)
+        user.save()
+
+        data = UserMeSerializer(user).data
+
+        assert len(data["unidades"]) == 1
+        unidade_data = data["unidades"][0]
+
+        assert unidade_data["ue"]["codigo_eol"] is None
+        assert unidade_data["ue"]["nome"] is None
+        assert unidade_data["ue"]["sigla"] is None
+
+        assert unidade_data["dre"]["codigo_eol"] == dre.codigo_eol
+        assert unidade_data["dre"]["nome"] == dre.nome
+        assert unidade_data["dre"]["sigla"] == dre.sigla
