@@ -218,3 +218,31 @@ class SmeIntegracaoService:
         except Exception as err:
             logger.exception("Erro inesperado ao atribuir perfil para %s: %s", login, err)
             raise SmeIntegracaoException(str(err))
+
+    @classmethod
+    def remover_perfil_coresso(cls, login: str) -> None:
+        """ Remove o perfil guide ao usuário no CoreSSO. """
+
+        logger.info("Iniciando remoção de perfil guide para o login: %s", login)
+
+        perfil_guide = env('PERFIL_INDIRETA_DIRETOR_DE_ESCOLA_GIPE', default='')
+        url = f"{env('SME_INTEGRACAO_URL', default='')}/perfis/servidores/excluir"
+
+        data = {
+            'codigoRF': login,
+            'perfilGuid': perfil_guide
+        }
+
+        try:
+            response = requests.delete(url, data=data, headers=cls.DEFAULT_HEADERS, timeout=cls.DEFAULT_TIMEOUT)
+
+            if response.status_code == status.HTTP_200_OK:
+                logger.info("Perfil removido com sucesso ao login: %s", login)
+                return
+
+            logger.error("Falha na remoção de perfil para %s. Status: %s, Resposta: %s", login, response.status_code, response.text)
+            raise SmeIntegracaoException("Falha ao fazer remoção de perfil.")
+
+        except Exception as err:
+            logger.exception("Erro inesperado ao remover perfil para %s: %s", login, err)
+            raise SmeIntegracaoException(str(err))

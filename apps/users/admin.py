@@ -199,7 +199,63 @@ class UserAdmin(BaseUserAdmin):
             "title": "Você confirma o envio dos usuários selecionados para o CoreSSO?",
         })
     
-    actions = ["enviar_para_core_sso"]
+    @admin.action(description="Remover perfil do CoreSSO")
+    def remover_do_core_sso(self, request, queryset):
+
+        if 'confirm' in request.POST:
+            removidos = 0
+            erros = 0
+            erros_detalhes = []
+
+            queryset_filtrado = queryset.filter(
+                rede=TipoGestaoChoices.INDIRETA,
+                is_validado=True,
+                is_core_sso=True
+            )
+
+            for usuario in queryset_filtrado:
+                try:
+                    CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso(
+                        login=usuario.username,
+                    )
+
+                    removidos += 1
+
+                except CargaUsuarioException as e:
+                    erros += 1
+                    erros_detalhes.append(f"{usuario.username}: {str(e)}")
+
+            ignorados = queryset.count() - queryset_filtrado.count()
+
+            if removidos:
+                self.message_user(
+                    request,
+                    f"{removidos} perfil(is) removido(s) do CoreSSO com sucesso!",
+                    messages.SUCCESS
+                )
+
+            if erros:
+                for detalhe in erros_detalhes:
+                    self.message_user(request, detalhe, messages.ERROR)
+
+            if ignorados:
+                self.message_user(
+                    request,
+                    f"{ignorados} usuário(s) ignorado(s). Só é possível remover perfis de usuários da rede INDIRETA que já estão no CoreSSO.",
+                    messages.WARNING
+                )
+
+            return None
+
+        request.current_app = self.admin_site.name
+        return render(request, "admin/users/user/confirm_remover_core_sso.html", {
+            "queryset": queryset,
+            "action": "remover_do_core_sso",
+            "title": "Você confirma a remoção do perfil dos usuários selecionados no CoreSSO?",
+        })
+
+
+    actions = ["enviar_para_core_sso", "remover_do_core_sso"]
 
 
 @admin.register(Cargo)
