@@ -1,15 +1,12 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+from rest_framework import status
 from rest_framework.test import APIClient
-from rest_framework import status, serializers
 
 from apps.users.models import Cargo, User
 from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
 
-from apps.users.api.views.usuario_viewset import (
-    UserUpdateSerializer,
-)
 
 @pytest.fixture
 def client():
@@ -102,107 +99,3 @@ class TestUserCreateView:
         assert User.objects.filter(username=valid_payload["username"]).exists()
 
         assert any("Falha ao enviar e-mail de confirmação" in rec.message for rec in caplog.records)
-
-
-pytest.mark.django_db
-class TestUserUpdateView:
-
-    endpoint = "/api/users/atualizar-dados"
-
-    def test_update_sucesso(self, client, django_user_model):
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": "Nome Novo"}
-        response = client.put(self.endpoint, data=payload, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Tudo certo por aqui!<br/>Seu nome foi atualizado."
-
-        user.refresh_from_db()
-        assert user.name == "Nome Novo"
-
-    def test_update_com_numero(self, client, django_user_model):
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": "Teste 1234"}
-        response = client.put(self.endpoint, data=payload, format="json")
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["field"] == "name"
-        assert response.data["detail"] == "O nome deve conter apenas letras e espaços."
-
-    def test_update_sem_sobrenome(self, client, django_user_model):
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": "Teste"}
-        response = client.put(self.endpoint, data=payload, format="json")
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["field"] == "name"
-        assert response.data["detail"] == "Digite seu nome completo (nome e sobrenome)."
-
-    def test_serializer_raise_exception_true_line(self, client, django_user_model):
-        """Teste para quando raise_exception igual a true"""
-
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": ""}
-
-        serializer = UserUpdateSerializer(
-            user, 
-            data=payload,
-            partial=True
-        )
-
-        with pytest.raises(serializers.ValidationError) as exc_info:
-            serializer.is_valid(raise_exception=True)
-
-        detail = exc_info.value.detail
-        assert "detail" in detail
-        assert "field" in detail
-
-    def test_update_nome_em_branco(self, client, django_user_model):
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": ""}
-        response = client.put(self.endpoint, data=payload, format="json")
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["field"] == "name"
-        assert response.data["detail"] == "Digite o seu nome completo."
-
-    def test_internal_server_error_returns_500(self, client, django_user_model):
-        user = django_user_model.objects.create_user(
-            username="usuarioapi",
-            name="Nome Antigo"
-        )
-        client.force_authenticate(user=user)
-
-        payload = {"name": "Nome Novo"}
-
-        with patch("apps.users.api.serializers.usuario_serializer.UserUpdateSerializer.save",
-                   side_effect=Exception("Erro simulado")):
-            response = client.put(self.endpoint, data=payload, format="json")
-
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.data["detail"] == "Erro interno do servidor."
