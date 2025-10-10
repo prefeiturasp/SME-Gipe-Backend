@@ -380,3 +380,158 @@ class TestEnviarParaCoreSSOAction:
 
         assert any("Falha simulada" in m for m in messages_text)
         assert response.status_code == 200
+        
+@pytest.mark.django_db
+class TestRemoverDoCoreSSOAction:
+
+    def test_render_confirmation_template(self, admin_client, cargo):
+        user = User.objects.create_user(
+            username="user1",
+            name="User 1",
+            cpf="12345678901",
+            cargo=cargo,
+            rede=TipoGestaoChoices.INDIRETA,
+            password="Test1234@",
+            is_validado=True,
+            is_core_sso=True,
+        )
+        url = reverse("admin:users_user_changelist")
+        data = {
+            "action": "remover_do_core_sso",
+            "_selected_action": [user.pk],
+        }
+        response = admin_client.post(url, data)
+        template_names = [t.name for t in response.templates if t.name]
+
+        assert response.status_code == 200
+        assert any("confirm_remover_core_sso.html" in name for name in template_names)
+
+    @patch("apps.users.services.usuario_core_sso_service.CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso", return_value=None)
+    def test_action_with_valid_users(self, mock_remover, admin_client, cargo):
+        user = User.objects.create_user(
+            username="user_valid",
+            name="User Valid",
+            cpf="12345678902",
+            email="valid@exemplo.com",
+            cargo=cargo,
+            rede=TipoGestaoChoices.INDIRETA,
+            password="Test1234@",
+            is_validado=True,
+            is_core_sso=True,
+        )
+
+        url = reverse("admin:users_user_changelist")
+        data = {
+            "action": "remover_do_core_sso",
+            "_selected_action": [user.pk],
+            "confirm": "yes",
+        }
+
+        response = admin_client.post(url, data, follow=True)
+        messages = [str(m) for m in response.context["messages"]]
+
+        assert response.status_code == 200
+        assert any("perfil(is) removido(s) do CoreSSO com sucesso!" in m for m in messages)
+
+        mock_remover.assert_called_once_with(
+            login=user.username,
+        )
+
+    def test_action_with_invalid_users(self, admin_client, cargo):
+        user = User.objects.create_user(
+            username="user_invalid",
+            name="User Invalid",
+            cpf="12345678903",
+            cargo=cargo,
+            rede=TipoGestaoChoices.DIRETA,
+            password="Test1234@",
+            is_validado=False,
+            is_core_sso=False,
+        )
+        url = reverse("admin:users_user_changelist")
+        data = {
+            "action": "remover_do_core_sso",
+            "_selected_action": [user.pk],
+            "confirm": "yes",
+        }
+
+        response = admin_client.post(url, data, follow=True)
+
+        assert response.status_code == 200
+        assert any("Só é possível remover perfis de usuários da rede INDIRETA" in str(m) for m in response.context["messages"])
+
+    @patch("apps.users.admin.CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso")
+    def test_action_with_mixed_users(self, mock_remover, admin_client, cargo):
+        def side_effect(login):
+            if login == "user_valid":
+                return None
+            raise CargaUsuarioException("Erro simulado ao remover")
+
+        mock_remover.side_effect = side_effect
+
+        user_valid = User.objects.create_user(
+            username="user_valid",
+            name="User Valid",
+            cpf="12345678902",
+            email="valid@exemplo.com",
+            cargo=cargo,
+            rede=TipoGestaoChoices.INDIRETA,
+            password="Test1234@",
+            is_validado=True,
+            is_core_sso=True,
+        )
+
+        user_invalid = User.objects.create_user(
+            username="user_invalid",
+            name="User Invalid",
+            cpf="12345678903",
+            email="invalid@exemplo.com",
+            cargo=cargo,
+            rede=TipoGestaoChoices.INDIRETA,
+            password="Test1234@",
+            is_validado=True,
+            is_core_sso=True,
+        )
+
+        url = reverse("admin:users_user_changelist")
+        data = {
+            "action": "remover_do_core_sso",
+            "_selected_action": [user_valid.pk, user_invalid.pk],
+            "confirm": "yes",
+        }
+
+        response = admin_client.post(url, data, follow=True)
+        messages = [str(m) for m in response.context["messages"]]
+
+        assert response.status_code == 200
+        assert any("perfil(is) removido(s) do CoreSSO com sucesso!" in m for m in messages)
+        assert any("user_invalid: Erro simulado ao remover" in m for m in messages)
+
+    @patch("apps.users.admin.CriaUsuarioCoreSSOService.remover_perfil_usuario_core_sso")
+    def test_action_gera_erro_carga_usuario_exception(self, mock_remover, admin_client, cargo):
+        mock_remover.side_effect = CargaUsuarioException("Falha simulada")
+
+        user = User.objects.create_user(
+            username="user_erro",
+            name="User Erro",
+            cpf="12345678906",
+            cargo=cargo,
+            rede="INDIRETA",
+            password="Test1234@",
+            is_validado=True,
+            is_core_sso=True,
+        )
+
+        url = reverse("admin:users_user_changelist")
+        data = {
+            "action": "remover_do_core_sso",
+            "_selected_action": [user.pk],
+            "confirm": "yes",
+        }
+
+        response = admin_client.post(url, data, follow=True)
+
+        messages_text = [str(m) for m in response.context["messages"]]
+
+        assert any("Falha simulada" in m for m in messages_text)
+        assert response.status_code == 200

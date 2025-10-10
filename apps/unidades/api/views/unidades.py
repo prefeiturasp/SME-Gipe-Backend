@@ -1,22 +1,24 @@
-import logging
 import uuid
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework import status
+import logging
+
 from django.shortcuts import get_object_or_404
 
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
 from apps.unidades.api.serializers.unidades import UnidadeSerializer
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
 logger = logging.getLogger(__name__)
 
 
-class UnidadeViewSet(GenericViewSet):
+class UnidadeViewSet(ModelViewSet):
     permission_classes = [AllowAny]
     serializer_class = UnidadeSerializer
     queryset = Unidade.objects.all()
-    lookup_field = 'uuid'
 
     def list(self, request, *args, **kwargs):
         tipo = request.query_params.get("tipo")
@@ -30,9 +32,13 @@ class UnidadeViewSet(GenericViewSet):
         if tipo == "UE":
             return self._listar_ues(codigo_dre)
 
+        if tipo is None:
+            logger.info("Nenhum parâmetro 'tipo' informado. Retornando todas as unidades.")
+            return super().list(request, *args, **kwargs)
+
         logger.warning("Parâmetro 'tipo' inválido recebido: %s", tipo)
         return self._resposta_erro(
-            "Parâmetro 'tipo' inválido. Use 'DRE' ou 'UE'.",
+            "Parâmetro 'tipo' inválido. Use 'DRE', 'UE' ou não informe para listar todos.",
             status.HTTP_400_BAD_REQUEST
         )
 
@@ -80,3 +86,21 @@ class UnidadeViewSet(GenericViewSet):
 
     def _resposta_erro(self, mensagem, status_code):
         return Response({"detail": mensagem}, status=status_code)
+    
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], url_path="verificar-unidade")
+    def verificar_unidade(self, request, pk=None):
+        """ Verifica se a unidade pertence ao usuário autenticado """
+        
+        user = request.user
+        unidade = self.get_object()
+
+        if unidade in user.unidades.all():
+            return Response(
+                {"detail": "A unidade pertence ao usuário."},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            {"detail": "A unidade não pertence ao usuário."},
+            status=status.HTTP_403_FORBIDDEN
+        )
