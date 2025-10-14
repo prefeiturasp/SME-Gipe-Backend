@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Alteração de e-mail</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h2 {
+            font-size: 18px;
+            color: #111827;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>Olá, <strong>{{ usuario_nome }}</strong>,</p>
+
+        <p>Você pediu para alterar o e-mail da sua conta. Para confirmar essa mudança, clique no link abaixo:</p>
+
+        <p style="text-align:left;">
+            <a href="{{ link }}">{{ link }}</a>
+        </p>
+
+        <p>Este link é válido por 30 minutos. Se o tempo expirar, será necessário solicitar um novo.</p>
+
+        <p>Caso não tenha solicitado essa alteração, basta ignorar esta mensagem. Seu e-mail cadastrado continuará o mesmo.</p>
+
+        <p>Atenciosamente,<br>
+        Gabinete Integrado de Proteção Escolar [GIPE]</p>
+    </div>
+</body>
+</html>

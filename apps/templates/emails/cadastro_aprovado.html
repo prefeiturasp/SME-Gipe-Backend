@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seu acesso ao GIPE foi aprovado!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Roboto', Arial, sans-serif; background-color: #ffffff;">
+    <div style="max-width: 645px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        
+        <div style="background-color: #ffffff; padding: 25px 20px;">
+            <img src="{{aplicacao_url}}/django_static/images/logo_GIPE.png" alt="GIPE" style="max-width: 220px; height: auto;">
+        </div>
+        
+        <div style="padding: 30px; color: #42474A; line-height: 1.375;">
+            
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Boas vindas, <span style="font-weight: 700;">{{ nome_usuario }}</span>!
+            </p>
+            
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Seu cadastro no GIPE, plataforma da Secretaria Municipal de Educação da cidade de São Paulo 
+                para registro de intercorrências escolares, foi aprovado! 
+                <span style="font-weight: 700;">Agora você já pode acessar o sistema.</span>
+            </p>
+
+            <div style="
+                width: 100%;
+                max-width:550px;
+                border-radius:4px;
+                background:#F5F5F5;
+                display:flex;
+                flex-direction:column;
+                align-items:flex-start;
+                gap:8px;
+                padding:16px;
+                text-align:left;
+            ">
+                <p style="margin:0 0 12px 0; font-size: 14px">
+                <strong>Credenciais de acesso:</strong>
+                </p>
+
+                <p style="margin:0 0 8px 0; font-size: 14px">
+                Usuário: <strong>Número do seu CPF</strong> (cadastrado durante o preenchimento do formulário)
+                </p>
+
+                <p style="margin:0 0 8px 0; font-size:14px;">
+                Senha: <strong>{{senha}}</strong> seguida dos 4 últimos dígitos do seu CPF
+                </p>
+
+                <hr style="border:none; border-top:1px solid #cccccc; width:100%; margin:16px auto;">
+
+                <p style="margin:0; font-size: 12px">
+                Importante: Você pode alterar a sua senha diretamente no sistema clicando em 
+                "meus dados", porém, ela se tornará padrão e será utilizada para acessar 
+                todos os sistemas da SME aos quais você já possui acesso.
+                </p>
+            </div>
+
+            <p style="font-size:14px; color:#000000; margin:24px 0 12px 0;">
+                Clique no botão para acessar o GIPE.
+            </p>
+
+            <div style="
+                width:231px;
+                height:40px;
+                background:#717FC7;
+                border-radius:4px;
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                margin-bottom:32px;
+            ">
+                <a href="{{aplicacao_url}}" target="_blank" 
+                style="display:block; width:100%; height:100%; line-height:40px;
+                        font-size:14px; color:#ffffff; text-decoration:none; font-weight:bold;
+                        text-align:center;">
+                Acessar agora
+                </a>
+            </div>
+
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Se o botão não funcionar, copie o link e cole no seu navegador:<br>
+                <span style="word-break: break-all;">{{aplicacao_url}}</span>
+            </p>
+
+            <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
+                Em caso de dúvidas ou dificuldades de acesso, entre em contato com o gabinete da DRE.
+            </p>
+            
+            <p style="margin: 0; font-size: 14px; font-weight: 400;">
+                Atenciosamente,<br>
+                Gabinete Integrado de Proteção Escolar [GIPE].
+            </p>
+        </div>
+    </div>
+</body>
+</html>
