@@ -168,16 +168,20 @@ class LoginView(TokenObtainPairView):
             logger.error(f'Erro inesperado: {e}')
             raise DatabaseError('Ocorreu um erro inesperado. Verifique os dados e tente novamente.')
         
-    def _generate_token(self, user: dict) -> dict:
+    def _generate_token(self, user) -> dict:
         """Gera tokens JWT para o usuário"""
 
         refresh = RefreshToken.for_user(user)
+
+        primeira_unidade = user.unidades.first()
+        codigo_unidade_eol = primeira_unidade.codigo_eol if primeira_unidade else None
 
         refresh["username"] = user.username
         refresh["name"] = getattr(user, "name", "") or ""
         if getattr(user, "cargo", None):
             refresh["perfil_codigo"] = user.cargo.codigo
             refresh["perfil_nome"] = user.cargo.nome
+        refresh["codigo_unidade_eol"] = codigo_unidade_eol
 
         access = refresh.access_token
         access["username"] = user.username
@@ -185,12 +189,14 @@ class LoginView(TokenObtainPairView):
         if getattr(user, "cargo", None):
             access["perfil_codigo"] = user.cargo.codigo
             access["perfil_nome"] = user.cargo.nome
+        access["codigo_unidade_eol"] = codigo_unidade_eol
 
         return {
             "access": str(access),
             "refresh": str(refresh),
         }
-    
+
+
     def _build_user_response(self, login: str, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """Monta resposta com dados do usuário"""
             
