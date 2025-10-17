@@ -96,15 +96,15 @@ class TestLoginView:
 
     @pytest.mark.django_db
     @patch("apps.users.models.User.objects.update_or_create")
-    @patch("apps.users.models.User.objects.get")
+    @patch("apps.users.models.User.objects.filter")
     @patch("apps.users.models.Cargo.objects.update_or_create")
-    def test_create_or_update_user_with_cargo_success(self, mock_cargo_update_or_create, mock_user_get, mock_user_update_or_create):
+    def test_create_or_update_user_with_cargo_success(self, mock_cargo_update_or_create, mock_user_filter, mock_user_update_or_create):
         mock_cargo = MagicMock()
         mock_cargo_update_or_create.return_value = (mock_cargo, True)
 
         mock_user = MagicMock()
         mock_user.check_password.return_value = False 
-        mock_user_get.return_value = mock_user
+        mock_user_filter.return_value.first.return_value = mock_user
         mock_user_update_or_create.return_value = (mock_user, True)
 
         view = LoginView()
@@ -127,7 +127,7 @@ class TestLoginView:
         mock_cargo_update_or_create.assert_called_once_with(
             codigo=99, defaults={"nome": "Cargo Teste"}
         )
-        mock_user_get.assert_called_once_with(username="usuario1")
+        mock_user_filter.assert_called_once_with(username="usuario1")
         mock_user_update_or_create.assert_called_once()
 
 
