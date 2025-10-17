@@ -143,10 +143,10 @@ class LoginView(TokenObtainPairView):
                         'is_core_sso':True,
                         'last_login': timezone.now(),
                     }
-                
-                user = User.objects.get(username=login)
 
-                if not user.check_password(senha):
+                user = User.objects.filter(username=login).first()
+
+                if user and not user.check_password(senha):
                     dict_user.update({'password': senha})
 
                 user, _ = User.objects.update_or_create(
