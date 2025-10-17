@@ -60,7 +60,7 @@ class CargosService:
         """ Extrai cargo permitido dos dados retornados """
 
         # Prioriza cargos sobrepostos, senão usa cargos normais
-        cargos_lista = cargos_data.get('cargosSobrePosto', cargos_data.get('cargos', []))
+        cargos_lista = cargos_data.get('cargosSobrePosto') or cargos_data.get('cargos', [])
         
         if not cargos_lista:
             logger.warning("Nenhum cargo encontrado nos dados: %s", cargos_data)
