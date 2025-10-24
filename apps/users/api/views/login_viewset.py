@@ -13,7 +13,7 @@ from apps.users.models import Cargo
 from apps.users.services.cargos_service import CargosService
 from apps.users.services.login_service import AutenticacaoService
 from apps.users.api.serializers.login_serializer import LoginSerializer
-from apps.helpers.exceptions import AuthenticationError, UserNotFoundError
+from apps.helpers.exceptions import AuthenticationError, UserNotFoundError, SmeIntegracaoException
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -53,6 +53,13 @@ class LoginView(TokenObtainPairView):
             return Response(
                 {'detail': 'Usuário e/ou senha inválida'}, 
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        except SmeIntegracaoException as e:
+            logger.warning("Falha na autenticação: %s", str(e))
+            return Response(
+                {'detail': 'Parece que estamos com uma instabilidade no momento. Tente entrar novamente daqui a pouco.'}, 
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
             
         except UserNotFoundError as e:
