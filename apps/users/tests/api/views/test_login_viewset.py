@@ -3,7 +3,7 @@ from rest_framework.test import APIRequestFactory
 from rest_framework import status
 from unittest.mock import patch, MagicMock
 from apps.users.api.views.login_viewset import LoginView
-from apps.helpers.exceptions import AuthenticationError
+from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException
 from django.db import IntegrityError, DatabaseError
 from apps.users.models import User, Cargo
 
@@ -365,3 +365,18 @@ class TestCargoAlternativo:
             result = view._get_cargo_gipe_ou_ponto_focal('usuario')
 
         assert result is None
+
+    @pytest.mark.django_db
+    @patch("apps.users.api.views.login_viewset.AutenticacaoService.autentica")
+    def test_login_view_sme_integracao_exception(self, mock_autentica):
+        """Deve retornar 503 quando o serviço externo estiver fora do ar"""
+        mock_autentica.side_effect = SmeIntegracaoException("Erro de comunicação com CoreSSO")
+
+        factory = APIRequestFactory()
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha123"}, format='json')
+
+        view = LoginView.as_view()
+        response = view(request)
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert "instabilidade" in response.data["detail"]
