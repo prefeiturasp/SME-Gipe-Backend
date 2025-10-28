@@ -3,7 +3,7 @@ from rest_framework.test import APIRequestFactory
 from rest_framework import status
 from unittest.mock import patch, MagicMock
 from apps.users.api.views.login_viewset import LoginView
-from apps.helpers.exceptions import AuthenticationError
+from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException
 from django.db import IntegrityError, DatabaseError
 from apps.users.models import User, Cargo
 
@@ -96,15 +96,15 @@ class TestLoginView:
 
     @pytest.mark.django_db
     @patch("apps.users.models.User.objects.update_or_create")
-    @patch("apps.users.models.User.objects.get")
+    @patch("apps.users.models.User.objects.filter")
     @patch("apps.users.models.Cargo.objects.update_or_create")
-    def test_create_or_update_user_with_cargo_success(self, mock_cargo_update_or_create, mock_user_get, mock_user_update_or_create):
+    def test_create_or_update_user_with_cargo_success(self, mock_cargo_update_or_create, mock_user_filter, mock_user_update_or_create):
         mock_cargo = MagicMock()
         mock_cargo_update_or_create.return_value = (mock_cargo, True)
 
         mock_user = MagicMock()
         mock_user.check_password.return_value = False 
-        mock_user_get.return_value = mock_user
+        mock_user_filter.return_value.first.return_value = mock_user
         mock_user_update_or_create.return_value = (mock_user, True)
 
         view = LoginView()
@@ -127,7 +127,7 @@ class TestLoginView:
         mock_cargo_update_or_create.assert_called_once_with(
             codigo=99, defaults={"nome": "Cargo Teste"}
         )
-        mock_user_get.assert_called_once_with(username="usuario1")
+        mock_user_filter.assert_called_once_with(username="usuario1")
         mock_user_update_or_create.assert_called_once()
 
 
@@ -365,3 +365,18 @@ class TestCargoAlternativo:
             result = view._get_cargo_gipe_ou_ponto_focal('usuario')
 
         assert result is None
+
+    @pytest.mark.django_db
+    @patch("apps.users.api.views.login_viewset.AutenticacaoService.autentica")
+    def test_login_view_sme_integracao_exception(self, mock_autentica):
+        """Deve retornar 400 quando o serviço externo estiver fora do ar"""
+        mock_autentica.side_effect = SmeIntegracaoException("Erro de comunicação com CoreSSO")
+
+        factory = APIRequestFactory()
+        request = factory.post("/api/login", {"username": "1234567", "password": "senha123"}, format='json')
+
+        view = LoginView.as_view()
+        response = view(request)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "instabilidade" in response.data["detail"]
