@@ -20,7 +20,7 @@ class AutenticacaoService:
         "x-api-eol-key": env("SME_INTEGRACAO_TOKEN", default=""),
         "Content-Type": "application/json-patch+json"
     }
-    DEFAULT_TIMEOUT = 10
+    DEFAULT_TIMEOUT = 30
     
     @classmethod
     def autentica(cls, login: str, senha: str) -> dict:
