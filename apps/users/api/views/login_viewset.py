@@ -59,7 +59,7 @@ class LoginView(TokenObtainPairView):
             logger.warning("Falha na autenticação: %s", str(e))
             return Response(
                 {'detail': 'Parece que estamos com uma instabilidade no momento. Tente entrar novamente daqui a pouco.'}, 
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+                status=status.HTTP_400_BAD_REQUEST
             )
             
         except UserNotFoundError as e:

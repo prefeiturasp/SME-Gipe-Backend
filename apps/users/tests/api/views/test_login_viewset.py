@@ -369,7 +369,7 @@ class TestCargoAlternativo:
     @pytest.mark.django_db
     @patch("apps.users.api.views.login_viewset.AutenticacaoService.autentica")
     def test_login_view_sme_integracao_exception(self, mock_autentica):
-        """Deve retornar 503 quando o serviço externo estiver fora do ar"""
+        """Deve retornar 400 quando o serviço externo estiver fora do ar"""
         mock_autentica.side_effect = SmeIntegracaoException("Erro de comunicação com CoreSSO")
 
         factory = APIRequestFactory()
@@ -378,5 +378,5 @@ class TestCargoAlternativo:
         view = LoginView.as_view()
         response = view(request)
 
-        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "instabilidade" in response.data["detail"]
