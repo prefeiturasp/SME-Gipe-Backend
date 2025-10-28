@@ -115,8 +115,11 @@ class TestCriaUsuarioCoreSSOService:
         assert "Usuário inválido" in str(exc.value)
         assert "Email: Inválido" in str(exc.value)
 
-    def test_usuario_existe_retorno(self, dados_usuario_validos):
+    @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.usuario_core_sso_or_none")
+    def test_usuario_existe_retorno(self, mock_usuario_core_sso_or_none, dados_usuario_validos):
+        mock_usuario_core_sso_or_none.return_value = None
         result = CriaUsuarioCoreSSOService._usuario_existe(dados_usuario_validos["login"])
+        mock_usuario_core_sso_or_none.assert_called_once_with(login=dados_usuario_validos["login"])
         assert result is None
 
     def test_validar_dados_real(self, dados_usuario_validos):
