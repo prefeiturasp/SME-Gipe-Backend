@@ -86,21 +86,3 @@ class UnidadeViewSet(ModelViewSet):
 
     def _resposta_erro(self, mensagem, status_code):
         return Response({"detail": mensagem}, status=status_code)
-    
-    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], url_path="verificar-unidade")
-    def verificar_unidade(self, request, pk=None):
-        """ Verifica se a unidade pertence ao usuário autenticado """
-        
-        user = request.user
-        unidade = self.get_object()
-
-        if unidade in user.unidades.all():
-            return Response(
-                {"detail": "A unidade pertence ao usuário."},
-                status=status.HTTP_200_OK
-            )
-
-        return Response(
-            {"detail": "A unidade não pertence ao usuário."},
-            status=status.HTTP_403_FORBIDDEN
-        )
