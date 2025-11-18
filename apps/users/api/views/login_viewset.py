@@ -185,6 +185,8 @@ class LoginView(TokenObtainPairView):
 
         refresh["username"] = user.username
         refresh["name"] = getattr(user, "name", "") or ""
+        refresh["cpf"] = getattr(user, "cpf", "") or ""
+        refresh["email"] = getattr(user, "email", "") or ""
         if getattr(user, "cargo", None):
             refresh["perfil_codigo"] = user.cargo.codigo
             refresh["perfil_nome"] = user.cargo.nome
@@ -193,6 +195,8 @@ class LoginView(TokenObtainPairView):
         access = refresh.access_token
         access["username"] = user.username
         access["name"] = getattr(user, "name", "") or ""
+        access["cpf"] = getattr(user, "cpf", "") or ""
+        access["email"] = getattr(user, "email", "") or ""
         if getattr(user, "cargo", None):
             access["perfil_codigo"] = user.cargo.codigo
             access["perfil_nome"] = user.cargo.nome
