@@ -103,3 +103,21 @@ class TestUnidadeViewSet:
         assert "DRE Teste" in nomes
         assert "UE Indireta" in nomes
         assert "UE Direta" in nomes
+
+    def test_batch_sucesso(self, api_client, dre, ue_indireta, ue_direta):
+        codigos = [dre.codigo_eol, ue_indireta.codigo_eol]
+        response = api_client.post("/api/unidades/batch/", {"codigos": codigos}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        assert str(dre.codigo_eol) in response.data
+        assert str(ue_indireta.codigo_eol) in response.data
+        assert str(ue_direta.codigo_eol) not in response.data
+
+    def test_batch_codigos_vazio(self, api_client):
+        response = api_client.post("/api/unidades/batch/", {"codigos": []}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {}
+
+    def test_batch_codigos_nao_lista(self, api_client):
+        response = api_client.post("/api/unidades/batch/", {"codigos": "nao-lista"}, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["detail"] == "Campo 'codigos' deve ser uma lista."
