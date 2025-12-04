@@ -78,6 +78,27 @@ class UnidadeViewSet(ModelViewSet):
         logger.info("Filtrando UEs vinculadas à DRE uuid='%s'. Quantidade encontrada: %d", codigo_dre, unidades.count())
 
         return self._responder_com_serializador(unidades)
+    
+    @action(detail=False, methods=["post"], url_path="batch")
+    def batch(self, request):
+
+        codigos = request.data.get("codigos")
+
+        if not isinstance(codigos, list):
+            return Response(
+                {"detail": "Campo 'codigos' deve ser uma lista."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unidades = Unidade.objects.filter(codigo_eol__in=codigos)
+        serializer = UnidadeSerializer(unidades, many=True)
+
+        resposta = {
+            str(item["codigo_eol"]): item
+            for item in serializer.data
+        }
+
+        return Response(resposta)
 
     def _responder_com_serializador(self, unidades):
         serializer = self.get_serializer(unidades, many=True)
