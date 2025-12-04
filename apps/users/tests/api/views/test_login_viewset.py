@@ -1,11 +1,26 @@
+import secrets
 import pytest
-from rest_framework.test import APIRequestFactory
-from rest_framework import status
 from unittest.mock import patch, MagicMock
+from rest_framework.test import APIRequestFactory, APIClient
+from rest_framework import status
+
 from apps.users.api.views.login_viewset import LoginView
 from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException
-from django.db import IntegrityError, DatabaseError
 from apps.users.models import User, Cargo
+from django.db import IntegrityError, DatabaseError
+
+
+@pytest.fixture
+def authenticated_client(django_user_model):
+    def _create(username="tester"):
+        password = secrets.token_urlsafe(16)
+        user = django_user_model.objects.create_user(username=username)
+        user.set_password(password)
+        user.save()
+        client = APIClient()
+        client.force_authenticate(user=user)
+        return client, user, password
+    return _create
 
 
 class TestLoginView:
@@ -92,7 +107,6 @@ class TestLoginView:
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data["detail"] == "Erro interno do sistema. Tente novamente mais tarde."
-
 
     @pytest.mark.django_db
     @patch("apps.users.models.User.objects.update_or_create")
@@ -333,42 +347,40 @@ class TestCargoAlternativo:
         self.view = LoginView()
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_sucesso(self):
+    def test_get_cargo_gipe_ou_ponto_focal_sucesso(self, authenticated_client):
         cargo_real = Cargo.objects.create(nome='GIPE', codigo=0)
-        usuario = User.objects.create_user(username='testeuser', password='teste123')
+
+        _, usuario, _ = authenticated_client("testeuser")
         usuario.cargo = cargo_real
         usuario.save()
 
-        view = LoginView()
         with patch("apps.users.api.views.login_viewset.User.objects.get", return_value=usuario):
-            result = view._get_cargo_gipe_ou_ponto_focal('testeuser')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('testeuser')
 
         assert result == {'codigo': 0, 'nome': 'GIPE'}
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_nao_encontrado(self):
-        view = LoginView()
+    def test_get_cargo_gipe_ou_ponto_focal_nao_encontrado(self, authenticated_client):
         with patch("apps.users.api.views.login_viewset.User.objects.get", side_effect=User.DoesNotExist):
-            result = view._get_cargo_gipe_ou_ponto_focal('naoexiste')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('naoexiste')
 
         assert result is None
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_usuario_sem_cargo_valido(self):
+    def test_get_cargo_gipe_ou_ponto_focal_usuario_sem_cargo_valido(self, authenticated_client):
         cargo_real = Cargo.objects.create(nome='Outro Cargo', codigo=2)
-        usuario = User.objects.create_user(username='usuario', password='teste123')
+        _, usuario, _ = authenticated_client("usuario")
         usuario.cargo = cargo_real
         usuario.save()
 
-        view = LoginView()
         with patch("apps.users.api.views.login_viewset.User.objects.get", return_value=usuario):
-            result = view._get_cargo_gipe_ou_ponto_focal('usuario')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('usuario')
 
         assert result is None
 
     @pytest.mark.django_db
     @patch("apps.users.api.views.login_viewset.AutenticacaoService.autentica")
-    def test_login_view_sme_integracao_exception(self, mock_autentica):
+    def test_login_view_sme_integracao_exception(self, mock_autentica, authenticated_client):
         """Deve retornar 400 quando o serviço externo estiver fora do ar"""
         mock_autentica.side_effect = SmeIntegracaoException("Erro de comunicação com CoreSSO")
 

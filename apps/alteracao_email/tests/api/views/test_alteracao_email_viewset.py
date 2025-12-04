@@ -1,3 +1,4 @@
+import secrets
 import pytest
 from unittest.mock import patch
 from rest_framework.test import APIClient
@@ -15,18 +16,22 @@ from apps.helpers.exceptions import (
 
 
 @pytest.fixture
-def api_client(db):
+def api_client():
     return APIClient()
 
 
 @pytest.fixture
-def user(db):
-    return User.objects.create_user(
-        username="teste",
-        email="usuario@sme.prefeitura.sp.gov.br",
-        password="senha123",
-        cpf="12345678900",
+def user(db, django_user_model):
+    username = f"teste_{secrets.token_hex(4)}"
+    pwd = secrets.token_urlsafe(16)
+    user = django_user_model.objects.create_user(
+        username=username,
+        email=f"{username}@sme.prefeitura.sp.gov.br",
+        cpf=f"{secrets.randbelow(10**11):011d}",
     )
+    user.set_password(pwd)
+    user.save()
+    return user
 
 
 @pytest.mark.django_db
@@ -35,7 +40,6 @@ class TestSolicitarAlteracaoEmailViewSet:
     endpoint = "/api/alteracao-email/solicitar/"
 
     def test_create_success(self, api_client, user):
-
         api_client.force_authenticate(user=user)
         payload = {"new_email": "novo@sme.prefeitura.sp.gov.br"}
 
@@ -46,7 +50,6 @@ class TestSolicitarAlteracaoEmailViewSet:
         assert response.data["message"] == "E-mail de confirmação enviado com sucesso."
 
     def test_create_erro_inesperado(self, api_client, user):
-
         api_client.force_authenticate(user=user)
         payload = {"new_email": "falha@sme.prefeitura.sp.gov.br"}
 
@@ -66,7 +69,6 @@ class TestValidarAlteracaoEmailViewSet:
 
     endpoint = "/api/alteracao-email/validar/"
 
-    @pytest.mark.django_db
     def test_update_success(self, api_client, user):
         api_client.force_authenticate(user=user)
         pk = "123"
@@ -90,14 +92,12 @@ class TestValidarAlteracaoEmailViewSet:
         assert response.data["message"] == "E-mail alterado com sucesso."
         assert response.data["email"] == email_request.novo_email
 
-        # confirma que os dados foram salvos
         user.refresh_from_db()
         email_request.refresh_from_db()
         assert user.email == email_request.novo_email
         assert email_request.ja_usado is True
 
     def test_update_token_ja_utilizado(self, api_client, user):
-
         api_client.force_authenticate(user=user)
         pk = "456"
 
@@ -112,7 +112,6 @@ class TestValidarAlteracaoEmailViewSet:
         assert "Token já foi utilizado." in response.data["detail"]
 
     def test_update_token_expirado(self, api_client, user):
-
         api_client.force_authenticate(user=user)
         pk = "789"
 
@@ -127,7 +126,6 @@ class TestValidarAlteracaoEmailViewSet:
         assert "Token expirado." in response.data["detail"]
 
     def test_update_erro_inesperado(self, api_client, user):
-        
         api_client.force_authenticate(user=user)
         pk = "000"
 
@@ -141,7 +139,6 @@ class TestValidarAlteracaoEmailViewSet:
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data["detail"] == "Erro inesperado."
 
-    @pytest.mark.django_db
     def test_update_integracao_falha(self, api_client, user, caplog):
         api_client.force_authenticate(user=user)
         pk = "123"
@@ -171,4 +168,3 @@ class TestValidarAlteracaoEmailViewSet:
             "Erro na integração SME para alteração de email do usuário ID" in msg
             for msg in caplog.text.splitlines()
         )
-
