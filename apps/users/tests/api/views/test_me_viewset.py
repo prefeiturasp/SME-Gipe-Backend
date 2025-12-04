@@ -1,3 +1,4 @@
+import secrets
 import pytest
 from unittest.mock import patch
 
@@ -44,25 +45,30 @@ def unidade(db, dre):
 
 
 @pytest.fixture
-def user(db, cargo):
-    return User.objects.create_user(
+def user(db, cargo, django_user_model):
+    pwd = secrets.token_urlsafe(16)
+    user = django_user_model.objects.create_user(
         username="testuser",
         email="test@example.com",
-        password="testpass123",
         name="Test User",
         cargo=cargo
     )
+    user.set_password(pwd)
+    user.save()
+    return user
 
 
 @pytest.fixture
-def user_with_unidade(db, cargo, unidade):
-    user = User.objects.create_user(
+def user_with_unidade(db, cargo, unidade, django_user_model):
+    pwd = secrets.token_urlsafe(16)
+    user = django_user_model.objects.create_user(
         username="user2",
         email="user2@example.com",
-        password="testpass123",
         name="User Two",
         cargo=cargo
     )
+    user.set_password(pwd)
+    user.save()
     user.unidades.add(unidade)
     return user
 
@@ -119,14 +125,16 @@ class TestMeView:
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
             assert response.data["detail"] == "Não autenticado."
 
-    def test_get_user_not_found(self, api_client, db, cargo):
-        temp_user = User.objects.create_user(
+    def test_get_user_not_found(self, api_client, db, cargo, django_user_model):
+        pwd = secrets.token_urlsafe(16)
+        temp_user = django_user_model.objects.create_user(
             username="temp",
             email="temp@example.com",
-            password="temp123",
             cargo=cargo,
             name="Temp User"
         )
+        temp_user.set_password(pwd)
+        temp_user.save()
         api_client.force_authenticate(user=temp_user)
         temp_user.delete()
         response = api_client.get("/api/users/me")

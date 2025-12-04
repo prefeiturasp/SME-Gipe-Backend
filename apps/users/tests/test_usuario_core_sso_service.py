@@ -1,8 +1,10 @@
+import secrets
 import pytest
 from unittest.mock import patch
 from requests import ReadTimeout
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
 
 from apps.helpers.exceptions import CargaUsuarioException, SmeIntegracaoException
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
@@ -21,11 +23,14 @@ def dados_usuario_validos():
 
 @pytest.fixture
 def usuario_local(dados_usuario_validos):
-    return User.objects.create_user(
+    pwd = secrets.token_urlsafe(16)
+    user = User.objects.create_user(
         username=dados_usuario_validos["login"],
         email=dados_usuario_validos["email"],
-        password="testpass123",
     )
+    user.set_password(pwd)
+    user.save()
+    return user
 
 
 @pytest.mark.django_db
@@ -131,11 +136,13 @@ class TestCriaUsuarioCoreSSOService:
 
     @patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.atribuir_perfil_coresso")
     def test_criar_usuario_chama_servico_core_sso(self, mock_atribuir, dados_usuario_validos):
-        User.objects.create_user(
+        pwd = secrets.token_urlsafe(16)
+        user = User.objects.create_user(
             username=dados_usuario_validos["login"],
             email=dados_usuario_validos["email"],
-            password="testpass123",
         )
+        user.set_password(pwd)
+        user.save()
 
         with patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.cria_usuario_core_sso") as mock_cria:
             CriaUsuarioCoreSSOService._criar_usuario(dados_usuario_validos)
@@ -151,6 +158,7 @@ class TestCriaUsuarioCoreSSOService:
         with patch("apps.users.services.usuario_core_sso_service.SmeIntegracaoService.atribuir_perfil_coresso") as mock_atribuir:
             CriaUsuarioCoreSSOService._adiciona_perfil_guide_core_sso(dados_usuario_validos["login"])
             mock_atribuir.assert_called_once_with(login=dados_usuario_validos["login"])
+
 
 @pytest.mark.django_db
 class TestRemoverPerfilUsuarioCoreSSO:
