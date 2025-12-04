@@ -218,7 +218,7 @@ class TestRemoverPerfilUsuarioCoreSSO:
 
         assert result is None
         mock_delete.assert_called_once()
-        args, kwargs = mock_delete.call_args
+        _, kwargs = mock_delete.call_args
         assert "data" in kwargs
         assert kwargs["data"]["codigoRF"] == "1234567"
         assert "perfilGuid" in kwargs["data"]
