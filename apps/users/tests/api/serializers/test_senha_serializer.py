@@ -17,8 +17,8 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": uid,
             "token": token,
-            "password": "NovaSenha@123",
-            "password2": "NovaSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123",
         }
 
         ser = RedefinirSenhaSerializer(data=data)
@@ -28,8 +28,8 @@ class TestRedefinirSenhaSerializer:
         v = ser.validated_data
         assert "user" in v
         assert v["user"].pk == user.pk
-        assert "password" in v
-        assert "password2" not in v
+        assert "new_pass" in v
+        assert "new_pass_confirm" not in v
         assert "uid" not in v
 
     def test_password_mismatch(self, db, user):
@@ -38,8 +38,8 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": uid,
             "token": token,
-            "password": "NovaSenha@123",
-            "password2": "OutraSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "OutraSenha@123",
         }
 
         ser = RedefinirSenhaSerializer(data=data)
@@ -52,12 +52,12 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": "!!base64_invalido!!",
             "token": "qualquer",
-            "password": "NovaSenha@123",
-            "password2": "NovaSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123",
         }
         ser = RedefinirSenhaSerializer(data=data)
         assert not ser.is_valid()
-        assert "UID inválido" in str(ser.errors)
+        assert "UID inválido ou malformado." in str(ser.errors)
 
     def test_user_not_found(self, db):
         # UID de um PK que não existe
@@ -65,8 +65,8 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": fake_uid,
             "token": "qualquer",
-            "password": "NovaSenha@123",
-            "password2": "NovaSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123",
         }
         ser = RedefinirSenhaSerializer(data=data)
         assert not ser.is_valid()
@@ -77,8 +77,8 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": uid,
             "token": "token-invalido",
-            "password": "NovaSenha@123",
-            "password2": "NovaSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123",
         }
         ser = RedefinirSenhaSerializer(data=data)
         assert not ser.is_valid()
@@ -89,8 +89,8 @@ class TestRedefinirSenhaSerializer:
         data = {
             "uid": uid,
             "token": "token-invalido",
-            "password": "NovaSenha@123",
-            "password2": "NovaSenha@123",
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123",
         }
         ser = RedefinirSenhaSerializer(data=data)
         assert not ser.is_valid()

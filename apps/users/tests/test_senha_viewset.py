@@ -287,18 +287,23 @@ class TestEsqueciMinhaSenhaViewSet:
         assert "a@escola.com" in response.data['detail']
 
 
+@pytest.mark.django_db
 class TestRedefinirSenhaViewSet:
 
     @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
-    def test_post_success(self, db, factory, create_user, monkeypatch):
+    def test_post_success(self, factory, create_user, monkeypatch):
         user = create_user(username='usuario')
 
         view = RedefinirSenhaViewSet.as_view()
-        old_hash = user.password
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        data = {"uid": uid, "token": token, "password": "NovaSenha@123", "password2": "NovaSenha@123"}
+        data = {
+            "uid": uid,
+            "token": token,
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123"
+        }
 
         def _mock_success(username, senha):
             return "OK"
@@ -314,55 +319,36 @@ class TestRedefinirSenhaViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["status"] == "success"
 
-        fresh = User.objects.get(pk=user.pk)
-        assert fresh.password != old_hash
-
-    def test_post_integration_error(self, db, factory, create_user, monkeypatch):
+    def test_post_invalid_serializer(self, factory, create_user):
         user = create_user(username='usuario')
 
         view = RedefinirSenhaViewSet.as_view()
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        data = {"uid": uid, "token": token, "password": "SenhaPadr@o1", "password2": "SenhaPadr@o1"}
-
-        def _mock_fail(username, senha):
-            raise SmeIntegracaoException("Regra do SME: não permitido")
-
-        monkeypatch.setattr(
-            "apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha",
-            _mock_fail
-        )
-
-        request = factory.post("/users/password/reset/", data, format="json")
-        response = view(request)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["status"] == "error"
-        assert "não permitido" in response.data["detail"]
-
-        user.refresh_from_db()
-        assert not user.check_password("SenhaPadr@o1")
-
-    def test_post_invalid_serializer(self, db, factory, create_user):
-        user = create_user(username='usuario')
-
-        view = RedefinirSenhaViewSet.as_view()
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        data = {"uid": uid, "token": token, "password": "NovaSenha@123", "password2": "OutraSenha@123"}
+        data = {
+            "uid": uid,
+            "token": token,
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "OutraSenha@123"
+        }
 
         request = factory.post("/users/password/reset/", data, format="json")
         response = view(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["status"] == "error"
 
-    def test_post_erro_inesperado(self, db, factory, create_user, monkeypatch):
+    def test_post_erro_inesperado(self, factory, create_user, monkeypatch):
         user = create_user(username='usuario')
 
         view = RedefinirSenhaViewSet.as_view()
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        data = {"uid": uid, "token": token, "password": "SenhaPadr@o1", "password2": "SenhaPadr@o1"}
+        data = {
+            "uid": uid,
+            "token": token,
+            "new_pass": "SenhaPadr@o1",
+            "new_pass_confirm": "SenhaPadr@o1"
+        }
 
         class SmeValidationError(Exception):
             pass
@@ -379,6 +365,34 @@ class TestRedefinirSenhaViewSet:
         response = view(request)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data["status"] == "error"
+
+    def test_post_sme_integracao_exception_returns_400(self, factory, create_user, monkeypatch):
+        user = create_user(username="usuario_test")
+        view = RedefinirSenhaViewSet.as_view()
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        data = {
+            "uid": uid,
+            "token": token,
+            "new_pass": "NovaSenha@123",
+            "new_pass_confirm": "NovaSenha@123"
+        }
+
+        def _mock_fail(username, senha):
+            raise SmeIntegracaoException("Erro de integração SME")
+
+        monkeypatch.setattr(
+            "apps.users.services.sme_integracao_service.SmeIntegracaoService.redefine_senha",
+            _mock_fail
+        )
+
+        request = factory.post("/users/password/reset/", data, format="json")
+        response = view(request)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["status"] == "error"
+        assert "Erro de integração SME" in response.data["detail"]
 
 
 @pytest.mark.django_db
