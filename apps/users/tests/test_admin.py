@@ -18,7 +18,9 @@ from apps.users.admin import (
 )
 from apps.unidades.models.unidades import TipoGestaoChoices
 from apps.helpers.exceptions import CargaUsuarioException
+from apps.constants import LOGIN_PASS_FIELD
 
+DUMMY_PASS = secrets.token_urlsafe(16)
 
 @pytest.fixture
 def cargo():
@@ -44,7 +46,7 @@ def create_user(cargo, username="user", **kwargs):
     pwd = secrets.token_urlsafe(16)
     if "cargo" not in kwargs:
         kwargs["cargo"] = cargo
-    user = User.objects.create_user(username=username, password=pwd, **kwargs)
+    user = User.objects.create_user(username=username, **kwargs)
     user.set_password(pwd)
     user.save()
     return user, pwd
@@ -74,8 +76,8 @@ class TestUserAdmin:
                 "cargo": cargo.pk,
                 "rede": TipoGestaoChoices.DIRETA.value,
                 "unidades": [],
-                "password1": "My_R@ndom-P@ssw0rd1",
-                "password2": "My_R@ndom-P@ssw0rd1",
+                f"{LOGIN_PASS_FIELD}1": DUMMY_PASS,
+                f"{LOGIN_PASS_FIELD}2": DUMMY_PASS,
                 "is_active": True,
                 "is_staff": True,
                 "is_superuser": False,
@@ -127,8 +129,8 @@ class TestCustomUserCreationForm:
             "cargo": cargo.pk,
             "rede": TipoGestaoChoices.DIRETA.value,
             "unidades": [],
-            "password1": "Test1234@",
-            "password2": "Test1234@",
+            f"{LOGIN_PASS_FIELD}1": DUMMY_PASS,
+            f"{LOGIN_PASS_FIELD}2": DUMMY_PASS,
             "is_validado": True,
         })
         assert form.is_valid(), f"Form inválido com erros: {form.errors}"
@@ -141,8 +143,8 @@ class TestCustomUserCreationForm:
             "cargo": cargo.pk,
             "rede": TipoGestaoChoices.DIRETA.value,
             "unidades": [],
-            "password1": "Test1234@",
-            "password2": "Test1234@",
+            f"{LOGIN_PASS_FIELD}1": DUMMY_PASS,
+            f"{LOGIN_PASS_FIELD}2": DUMMY_PASS,
             "is_validado": True,
         })
         assert not form.is_valid()
