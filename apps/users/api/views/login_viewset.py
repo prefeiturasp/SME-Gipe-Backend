@@ -38,7 +38,7 @@ class LoginView(TokenObtainPairView):
             )
 
         login = serializer.validated_data["username"]
-        senha = serializer.validated_data["password"]
+        senha = serializer.validated_data["secret_pass"]
         
         try:
             auth_data = self._authenticate_user(login, senha)

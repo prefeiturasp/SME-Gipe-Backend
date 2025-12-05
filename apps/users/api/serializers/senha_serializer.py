@@ -35,7 +35,7 @@ class RedefinirSenhaSerializer(serializers.Serializer):
     default_error_messages = {
         "user_not_found": "Usuário não encontrado.",
         "token_invalid": "Token inválido ou expirado.",
-        "password_mismatch": "As senhas não conferem.",
+        "pass_mismatch": "As senhas não conferem.",
         "uid_invalid": "UID inválido ou malformado."
     }
 
@@ -48,7 +48,7 @@ class RedefinirSenhaSerializer(serializers.Serializer):
         # 1. Confirma que as senhas são iguais
         if new_pass != new_pass_confirm:
             logger.warning("Tentativa de redefinição com senhas diferentes para UID: %s", attrs.get("uid"))
-            self.fail("password_mismatch")
+            self.fail("pass_mismatch")
 
         # 2. Decodifica UID (já validado em validate_uid)
         try:
