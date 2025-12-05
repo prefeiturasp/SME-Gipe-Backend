@@ -60,6 +60,7 @@ extend-exclude = [
     "*/migrations/*.py",
     "staticfiles/*",
 ]
+extend-ignore = ["F403", "F405"]
 
 [tool.ruff.lint]
 select = [
@@ -135,3 +136,11 @@ extend-unsafe-fixes = [
 
 [tool.ruff.lint.isort]
 force-single-line = true
+
+# ==== Ruff per-file ignores ====
+[tool.ruff.lint.per-file-ignores]
+# Permite wildcard imports nos arquivos de settings do Django
+"config/settings/*.py" = [
+  "F403",  # 'from module import *' usado mas não consegue detectar nomes indefinidos
+  "F405",  # Nome pode estar indefinido, ou definido de star imports
+]
