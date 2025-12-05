@@ -1,9 +1,67 @@
 # ruff: noqa: E501
-from .base import *  # noqa: F403
+from .base import ACCOUNT_ADAPTER
+from .base import ACCOUNT_ALLOW_REGISTRATION
+from .base import ACCOUNT_EMAIL_VERIFICATION
+from .base import ACCOUNT_FORMS
+from .base import ACCOUNT_LOGIN_METHODS
+from .base import ACCOUNT_SIGNUP_FIELDS
+from .base import ADMIN_URL
+from .base import ADMINS
+from .base import APPS_DIR
+from .base import AUTH_PASSWORD_VALIDATORS
+from .base import AUTH_USER_MODEL
+from .base import AUTHENTICATION_BACKENDS
+from .base import BASE_DIR
+from .base import CORS_URLS_REGEX
+from .base import CRISPY_ALLOWED_TEMPLATE_PACKS
+from .base import CRISPY_TEMPLATE_PACK
+from .base import CSRF_COOKIE_HTTPONLY
 from .base import DATABASES
+from .base import DEBUG
+from .base import DEFAULT_AUTO_FIELD
+from .base import DEFAULT_FROM_EMAIL
+from .base import DJANGO_ADMIN_FORCE_ALLAUTH
+from .base import EMAIL_BACKEND
+from .base import EMAIL_HOST
+from .base import EMAIL_HOST_PASSWORD
+from .base import EMAIL_HOST_USER
+from .base import EMAIL_PORT
+from .base import EMAIL_TIMEOUT
+from .base import EMAIL_USE_TLS
+from .base import FIXTURE_DIRS
+from .base import FORM_RENDERER
 from .base import INSTALLED_APPS
+from .base import LANGUAGE_CODE
+from .base import LOCALE_PATHS
+from .base import LOGIN_REDIRECT_URL
+from .base import LOGIN_URL
+from .base import MANAGERS
+from .base import MEDIA_ROOT
+from .base import MEDIA_URL
+from .base import MIDDLEWARE
+from .base import MIGRATION_MODULES
+from .base import PASSWORD_HASHERS
+from .base import PASSWORD_RESET_TIMEOUT
+from .base import REDIS_SSL
 from .base import REDIS_URL
+from .base import REST_FRAMEWORK
+from .base import ROOT_URLCONF
+from .base import SESSION_COOKIE_HTTPONLY
+from .base import SIMPLE_JWT
+from .base import SITE_ID
+from .base import SOCIALACCOUNT_ADAPTER
+from .base import SOCIALACCOUNT_FORMS
 from .base import SPECTACULAR_SETTINGS
+from .base import STATIC_ROOT
+from .base import STATIC_URL
+from .base import STATICFILES_DIRS
+from .base import STATICFILES_FINDERS
+from .base import TEMPLATES
+from .base import TIME_ZONE
+from .base import USE_I18N
+from .base import USE_TZ
+from .base import WSGI_APPLICATION
+from .base import X_FRAME_OPTIONS
 from .base import env
 
 # GENERAL
@@ -14,55 +72,16 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # Atualizado para refletir o domínio real
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 
-# CORS (Cross-Origin Resource Sharing)
-# ------------------------------------------------------------------------------
-# CORS_ALLOWED_ORIGINS = [
-#     "https://qa-gipe.sme.prefeitura.sp.gov.br",
-# ]
 
 # CSRF (Cross-Site Request Forgery)
 # ------------------------------------------------------------------------------
 CSRF_TRUSTED_ORIGINS = env.str('CSRF_TRUSTED_ORIGINS', default='https://*.sme.prefeitura.sp.gov.br').split(',')
-# CSRF_TRUSTED_ORIGINS = [
-#     "https://qa-gipe.sme.prefeitura.sp.gov.br",
-# ]
 
 # DATABASES
 # ------------------------------------------------------------------------------
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
-# CACHES
-# ------------------------------------------------------------------------------
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": REDIS_URL,
-#         "OPTIONS": {
-#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#             # Mimicking memcache behavior.
-#             # https://github.com/jazzband/django-redis#memcached-exceptions-behavior
-#             "IGNORE_EXCEPTIONS": True,
-#         },
-#     },
-# }
 
-# SECURITY
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#secure-proxy-ssl-header
-# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-# https://docs.djangoproject.com/en/dev/ref/settings/#secure-ssl-redirect
-# SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
-# https://docs.djangoproject.com/en/dev/ref/settings/#session-cookie-secure
-# SESSION_COOKIE_SECURE = True
-# https://docs.djangoproject.com/en/dev/ref/settings/#session-cookie-name
-# SESSION_COOKIE_NAME = "__Secure-sessionid"
-# https://docs.djangoproject.com/en/dev/ref/settings/#csrf-cookie-secure
-# CSRF_COOKIE_SECURE = True
-# https://docs.djangoproject.com/en/dev/ref/settings/#csrf-cookie-name
-# CSRF_COOKIE_NAME = "__Secure-csrftoken"
-# https://docs.djangoproject.com/en/dev/topics/security/#ssl-https
-# https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-seconds
-# TODO: set this to 60 seconds first and then to 518400 once you prove the former works
 SECURE_HSTS_SECONDS = 60
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-include-subdomains
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
@@ -77,61 +96,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
     default=True,
 )
 
-# STATIC & MEDIA
-# ------------------------
-# STORAGES = {
-#     "default": {
-#         "BACKEND": "django.core.files.storage.FileSystemStorage",
-#     },
-#     "staticfiles": {
-#         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-#     },
-# }
 
-# EMAIL
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
-# DEFAULT_FROM_EMAIL = env(
-#     "DJANGO_DEFAULT_FROM_EMAIL",
-#     default="Django-DRF-Setup-Inicial <noreply@example.com>",
-# )
-# # https://docs.djangoproject.com/en/dev/ref/settings/#server-email
-# SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
-# # https://docs.djangoproject.com/en/dev/ref/settings/#email-subject-prefix
-# EMAIL_SUBJECT_PREFIX = env(
-#     "DJANGO_EMAIL_SUBJECT_PREFIX",
-#     default="[Django-DRF-Setup-Inicial] ",
-# )
-# ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
-
-# # ADMIN
-# # ------------------------------------------------------------------------------
-# # Django Admin URL regex.
-# ADMIN_URL = env("DJANGO_ADMIN_URL")
-
-# # Anymail
-# # ------------------------------------------------------------------------------
-# # https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
-# INSTALLED_APPS += ["anymail"]
-# # https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-# # https://anymail.readthedocs.io/en/stable/installation/#anymail-settings-reference
-# # https://anymail.readthedocs.io/en/stable/esps/mailgun/
-# EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
-# ANYMAIL = {
-#     "MAILGUN_API_KEY": env("MAILGUN_API_KEY"),
-#     "MAILGUN_SENDER_DOMAIN": env("MAILGUN_DOMAIN"),
-#     "MAILGUN_API_URL": env("MAILGUN_API_URL", default="https://api.mailgun.net/v3"),
-# }
-
-
-# LOGGING
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#logging
-# See https://docs.djangoproject.com/en/dev/topics/logging for
-# more details on how to customize your logging configuration.
-# A sample logging configuration. The only tangible logging
-# performed by this configuration is to send an email to
-# the site admins on every HTTP 500 error when DEBUG=False.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
