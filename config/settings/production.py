@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-from .base import *  # noqa: F403, F401
+from .base import *  # NOSONAR
 from .base import DATABASES
 from .base import INSTALLED_APPS
 from .base import REDIS_URL
