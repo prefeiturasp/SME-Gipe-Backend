@@ -1,6 +1,13 @@
 {% load allauth %}
 
 <table class="table">
-  {% slot %}
-{% endslot %}
+  <thead>
+    <tr>
+      <th>Header</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% slot %}
+    {% endslot %}
+  </tbody>
 </table>

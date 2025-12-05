@@ -28,13 +28,15 @@
     <!-- Action buttons -->
     <div class="row">
       <div class="col-sm-12">
-        <a class="btn btn-primary" href="{% url 'users:update' %}" role="button">My Info</a>
-        <a class="btn btn-primary"
-           href="{% url 'account_email' %}"
-           role="button">E-Mail</a>
-        <a class="btn btn-primary"
-           href="{% url 'mfa_index' %}"
-           role="button">MFA</a>
+        <form method="get" action="{% url 'users:update' %}" style="display: inline;">
+          <button type="submit" class="btn btn-primary">My Info</button>
+        </form>
+        <form method="get" action="{% url 'account_email' %}" style="display: inline;">
+          <button type="submit" class="btn btn-primary">E-Mail</button>
+        </form>
+        <form method="get" action="{% url 'mfa_index' %}" style="display: inline;">
+          <button type="submit" class="btn btn-primary">MFA</button>
+        </form>
         <!-- Your Stuff: Custom user template urls -->
       </div>
     </div>
