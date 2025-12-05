@@ -42,7 +42,7 @@ Para resolver este problema, entre em contato com o GIPE."
             user_local = User.objects.filter(username=username).first()
             if not user_local:
                 logger.warning("Usuário %s não encontrado no banco local.", username)
-                raise UserNotFoundError("Usuário ou RF não encontrado", usuario=username)
+                raise UserNotFoundError("Usuário ou RF não encontrado.", usuario=username)
 
             # Tenta buscar no CoreSSO
             try:
@@ -59,7 +59,7 @@ Para resolver este problema, entre em contato com o GIPE."
                 logger.info(
                     "Usuário %s possui email. Iniciando envio de redefinição.", username
                 )
-                return self._processar_envio_email(username, email)  # Apenas executa
+                return self._processar_envio_email(username, email)
 
             # Segrega fluxo
             if is_cpf(username):
@@ -220,7 +220,7 @@ class RedefinirSenhaViewSet(APIView):
 
         # Pega o usuário validado do serializer (mais seguro)
         user = serializer.validated_data["user"]
-        new_password = serializer.validated_data["password"]
+        new_password = serializer.validated_data["new_pass"]
 
         logger.info("Iniciando redefinição de senha para usuário ID: %s", user.id)
 
