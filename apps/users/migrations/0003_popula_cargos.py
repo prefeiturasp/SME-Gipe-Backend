@@ -9,7 +9,7 @@ def populate_cargos(apps, schema_editor):
     Popula a tabela de cargos com dados iniciais
     """
  
-    Cargo = apps.get_model('users', 'Cargo')
+    cargo = apps.get_model('users', 'Cargo')
  
     # Lista de cargos iniciais
     cargos_iniciais = [
@@ -21,7 +21,7 @@ def populate_cargos(apps, schema_editor):
     ]
  
     for cargo_data in cargos_iniciais:
-        Cargo.objects.get_or_create(
+        cargo.objects.get_or_create(
             codigo=cargo_data['codigo'],
             defaults={
                 'nome': cargo_data['nome'],
@@ -33,10 +33,10 @@ def reverse_populate_cargos(apps, schema_editor):
     """
     Função para reverter a migração (remover os cargos)
     """
-    Cargo = apps.get_model('users', 'Cargo')
+    cargo = apps.get_model('users', 'Cargo')
     # Códigos dos cargos a serem removidos
     codigos_para_remover = [3085]
-    Cargo.objects.filter(codigo__in=codigos_para_remover).delete()
+    cargo.objects.filter(codigo__in=codigos_para_remover).delete()
  
  
 class Migration(migrations.Migration):
