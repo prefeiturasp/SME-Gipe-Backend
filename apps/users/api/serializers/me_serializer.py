@@ -23,6 +23,7 @@ class UserMeSerializer(serializers.ModelSerializer):
             "rede",
             "is_core_sso",
             "is_validado",
+            "is_app_admin",
             "perfil_acesso",
             "unidades",
         )
