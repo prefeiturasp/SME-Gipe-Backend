@@ -1,11 +1,119 @@
-# apps/users/api/serializers/usuario_admin_serializer.py
-
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from apps.unidades.models.unidades import Unidade
-from apps.users.models import Cargo
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
 
 User = get_user_model()
+
+def format_cpf(cpf: str) -> str:
+    """
+    Formata CPF no padrão 000.000.000-00.
+    Se não tiver 11 dígitos, retorna como veio.
+    """
+    if not cpf:
+        return ""
+    digits = "".join(filter(str.isdigit, cpf))
+    if len(digits) != 11:
+        return cpf
+    return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+
+
+class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
+    """
+    Serializer para exibição na tabela de usuários (listagem).
+    Campos 'humanizados' para a tela.
+    """
+
+    perfil = serializers.CharField(source="cargo.nome", read_only=True)
+    nome = serializers.CharField(source="name", read_only=True)
+    data_solicitacao = serializers.DateTimeField(
+        source="date_joined",
+        format="%d/%m/%Y",
+        read_only=True,
+    )
+    rf_ou_cpf = serializers.SerializerMethodField()
+    rede = serializers.SerializerMethodField()
+    diretoria_regional = serializers.SerializerMethodField()
+    unidade_educacional = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "uuid",               # chave para o frontend
+            "perfil",             # cargo.nome
+            "username",             # cargo.nome
+            "nome",               # name
+            "data_solicitacao",   # data de criação formatada
+            "rf_ou_cpf",          # RF ou CPF formatado
+            "email",
+            "rede",               # label do choices
+            "diretoria_regional",
+            "unidade_educacional",
+            "is_validado",        # útil p/ ícone/badge
+        ]
+
+    # ---------- RF ou CPF ----------
+    def get_rf_ou_cpf(self, obj) -> str:
+        """
+        Regra:
+        - Se tiver CPF cadastrado -> devolve CPF formatado.
+        - Senão, usa o username (RF ou CPF bruto).
+        """
+        if obj.cpf:
+            return format_cpf(obj.cpf)
+        return obj.username or ""
+
+    # ---------- Rede (label) ----------
+    def get_rede(self, obj) -> str:
+        """
+        Usa o display do choices ou '-' se vazio.
+        """
+        try:
+            label = obj.get_rede_display()
+        except Exception:
+            label = obj.rede or ""
+        return label or "-"
+
+    # ---------- Diretoria Regional ----------
+    def get_diretoria_regional(self, obj):
+        """
+        Regra:
+        - Se o usuário tiver unidade do tipo DRE -> usa essa unidade como DRE.
+        - Senão, se tiver unidade escolar com dre associado -> usa unidade.dre.nome.
+        - Senão, retorna '-'.
+        """
+        # 1) DRE associada diretamente ao usuário
+        dre_unidade = obj.unidades.filter(
+            tipo_unidade=TipoUnidadeChoices.DRE
+        ).first()
+        if dre_unidade:
+            return dre_unidade.nome
+
+        # 2) DRE derivada da unidade escolar
+        unidade_escolar = obj.unidades.exclude(
+            tipo_unidade=TipoUnidadeChoices.DRE
+        ).select_related("dre").first()
+
+        if unidade_escolar and unidade_escolar.dre:
+            return unidade_escolar.dre.nome
+
+        return "-"
+
+    # ---------- Unidade Educacional ----------
+    def get_unidade_educacional(self, obj):
+        """
+        Regra:
+        - Para Diretor/Assistente/etc: pega primeira unidade que não seja DRE.
+        - Para Ponto Focal / GIPE (que normalmente só tem DRE ou nenhuma) -> '-'.
+        """
+        unidade_escolar = obj.unidades.exclude(
+            tipo_unidade=TipoUnidadeChoices.DRE
+        ).first()
+
+        if unidade_escolar:
+            return unidade_escolar.nome
+
+        return "-"
+
 
 class GestaoUsuarioSerializer(serializers.ModelSerializer):
     unidades = serializers.PrimaryKeyRelatedField(
@@ -103,7 +211,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         user_request = request.user
 
-        validated_data.setdefault("is_validado", True)
+        validated_data.setdefault("is_validado", False)
 
         # Garantir que Ponto Focal não consiga forçar is_app_admin via payload
         if not user_request.is_gipe:
