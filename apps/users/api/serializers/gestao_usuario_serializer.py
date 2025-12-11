@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
+from apps.unidades.models.unidades import TipoGestaoChoices, Unidade, TipoUnidadeChoices
+from django.db import transaction
+from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
 User = get_user_model()
 
@@ -210,16 +212,34 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         user_request = request.user
 
-        validated_data.setdefault("is_validado", False)
+        validated_data.setdefault("is_validado", True)
 
 
         if not user_request.is_gipe:
             is_app_admin = False
-
-        novo_user = User.objects.create_user(**validated_data)
-        novo_user.unidades.set(unidades)
-        novo_user.is_app_admin = is_app_admin
-        novo_user.save(update_fields=["is_app_admin"])
+            
+        try:
+            
+            with transaction.atomic():
+                novo_user = User.objects.create_user(**validated_data)
+                novo_user.unidades.set(unidades)
+                novo_user.is_app_admin = is_app_admin
+                novo_user.save(update_fields=["is_app_admin"])
+                
+                rede = validated_data.get("rede", None)
+                
+                if rede and rede == TipoGestaoChoices.INDIRETA:
+                
+                    dados_usuario_a_ser_enviado_coresso = {
+                        "login": novo_user.username,
+                        "nome": novo_user.name,
+                        "email": novo_user.email,
+                    }
+                    
+                    CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario_a_ser_enviado_coresso)
+                
+        except Exception as e:
+            raise serializers.ValidationError(f"Erro ao criar usuário: {str(e)}")
 
         return novo_user
 
