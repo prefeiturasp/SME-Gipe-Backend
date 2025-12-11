@@ -1,10 +1,88 @@
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from types import SimpleNamespace
 
-from apps.users.api.serializers.gestao_usuario_serializer import GestaoUsuarioSerializer
+from apps.users.api.serializers.gestao_usuario_serializer import (
+    GestaoUsuarioSerializer,
+    GestaoUsuarioListaSerializer,
+    format_cpf,
+)
 
 User = get_user_model()
+
+
+# ==========================================
+# Testes utilitário format_cpf
+# ==========================================
+
+def test_format_cpf_retorna_vazio_para_entrada_vazia():
+    assert format_cpf("") == ""
+    
+
+
+def test_format_cpf_retorna_original_quando_nao_tem_11_digitos():
+    assert format_cpf("1234567890") == "1234567890"
+    assert format_cpf("ABC123") == "ABC123"
+
+
+def test_format_cpf_formata_para_padroes_com_pontos_e_traco():
+    assert format_cpf("12345678901") == "123.456.789-01"
+    assert format_cpf("123.456.789-01") == "123.456.789-01"
+
+
+# ==========================================
+# Testes GestaoUsuarioListaSerializer - rf_ou_cpf e rede
+# ==========================================
+
+@pytest.mark.django_db
+def test_lista_serializer_get_rf_ou_cpf_prefere_cpf_formatado(user_comum):
+    serializer = GestaoUsuarioListaSerializer()
+    resultado = serializer.get_rf_ou_cpf(user_comum)
+    assert resultado == format_cpf(user_comum.cpf)
+
+
+def test_lista_serializer_get_rf_ou_cpf_retorna_username_quando_sem_cpf():
+    usuario = SimpleNamespace(cpf="", username="rf123")
+    serializer = GestaoUsuarioListaSerializer()
+
+    assert serializer.get_rf_ou_cpf(usuario) == "rf123"
+
+
+def test_lista_serializer_get_rede_usa_display_quando_disponivel():
+    usuario = SimpleNamespace(
+        get_rede_display=lambda: "Rede Direta",
+        rede="IGNORADO",
+    )
+    serializer = GestaoUsuarioListaSerializer()
+
+    assert serializer.get_rede(usuario) == "Rede Direta"
+
+
+def test_lista_serializer_get_rede_fallback_para_valor_bruto_quando_display_falha():
+    def boom():
+        raise AttributeError("boom")
+
+    usuario = SimpleNamespace(
+        get_rede_display=boom,
+        rede="INDIRETA",
+    )
+    serializer = GestaoUsuarioListaSerializer()
+
+    assert serializer.get_rede(usuario) == "INDIRETA"
+
+
+def test_lista_serializer_get_rede_retorna_hifen_quando_nao_ha_label():
+    def boom():
+        raise AttributeError("boom")
+
+    usuario = SimpleNamespace(
+        get_rede_display=boom,
+        rede="",
+    )
+    serializer = GestaoUsuarioListaSerializer()
+
+    assert serializer.get_rede(usuario) == "-"
 
 
 # ==========================================
@@ -246,7 +324,7 @@ def test_create_gipe_admin_cria_usuario_com_is_app_admin(
     assert novo_user.username == "novo_admin"
     assert novo_user.cpf == "99999999999"
     assert novo_user.is_app_admin is True
-    assert novo_user.is_validado is True
+    assert novo_user.is_validado is False
     assert escola_sp in novo_user.unidades.all()
 
 
@@ -318,10 +396,10 @@ def test_create_pf_ignora_is_app_admin_via_create(
 
 
 @pytest.mark.django_db
-def test_create_define_is_validado_true_por_padrao(
+def test_create_define_is_validado_false_por_padrao(
     api_rf, user_gipe_admin, cargo_comum, escola_sp
 ):
-    """Usuário criado via serializer tem is_validado=True por padrão."""
+    """Usuário criado via serializer tem is_validado=False por padrão."""
     request = api_rf.post("/fake/")
     request.user = user_gipe_admin
     
@@ -339,7 +417,7 @@ def test_create_define_is_validado_true_por_padrao(
     assert serializer.is_valid(raise_exception=True)
     
     novo_user = serializer.save()
-    assert novo_user.is_validado is True
+    assert novo_user.is_validado is False
 
 
 @pytest.mark.django_db

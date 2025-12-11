@@ -2,6 +2,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
+from apps.unidades.models.unidades import TipoGestaoChoices
+
 User = get_user_model()
 
 
@@ -60,6 +62,7 @@ def test_create_usuario_comum_negado(api_client, user_comum, cargo_comum):
 # Testes de get_queryset - GIPE Admin
 # ==========================================
 
+
 @pytest.mark.django_db
 def test_list_gipe_admin_ve_todos_usuarios(
     api_client, user_gipe_admin, usuario_dre_sp, usuario_dre_outra
@@ -67,14 +70,91 @@ def test_list_gipe_admin_ve_todos_usuarios(
     """GIPE admin vê todos os usuários do sistema."""
     api_client.force_authenticate(user=user_gipe_admin)
     response = api_client.get("/api/users/gestao-usuarios/")
-    
+
     assert response.status_code == status.HTTP_200_OK
     usernames = [u["username"] for u in response.data]
-    
+
     # Deve conter pelo menos os 3 usuários criados
     assert "gipe_admin" in usernames
     assert "usuario_dre_sp" in usernames
     assert "usuario_dre_outra" in usernames
+
+
+@pytest.mark.django_db
+def test_list_gipe_admin_filtra_por_dre(
+    api_client, user_gipe_admin, user_comum, outro_user_comum, dre_sp
+):
+    """Filtro 'dre' retorna somente usuários daquela DRE para o GIPE."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.get(
+        f"/api/users/gestao-usuarios/?dre={dre_sp.uuid}"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    usernames = [u["username"] for u in response.data]
+
+    assert "user_comum" in usernames
+    assert "outro_user" not in usernames
+
+
+@pytest.mark.django_db
+def test_list_filtra_por_unidade(
+    api_client, user_gipe_admin, user_comum, outro_user_comum, escola_sp
+):
+    """Filtro por unidade limita a listagem ao usuário da unidade informada."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.get(
+        f"/api/users/gestao-usuarios/?unidade={escola_sp.uuid}"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    usernames = [u["username"] for u in response.data]
+
+    assert usernames == ["user_comum"]
+
+
+@pytest.mark.django_db
+def test_list_filtra_por_ativo_false(api_client, user_gipe_admin, cargo_comum):
+    """Filtro 'ativo=false' retorna apenas usuários inativos."""
+    user_inativo = User.objects.create_user(
+        username="usuario_inativo",
+        email="inativo@example.com",
+        cpf="98989898989",
+        cargo=cargo_comum,
+        is_active=False,
+    )
+
+    api_client.force_authenticate(user=user_gipe_admin)
+    response = api_client.get("/api/users/gestao-usuarios/?ativo=false")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [u["username"] for u in response.data] == [user_inativo.username]
+
+
+@pytest.mark.django_db
+def test_list_filtra_pendentes_aprovacao_indireta(
+    api_client, user_gipe_admin, usuario_nao_validado, cargo_comum
+):
+    """Filtro 'pendente_aprovacao' limita a usuários indiretos não validados."""
+    usuario_nao_validado.rede = TipoGestaoChoices.INDIRETA
+    usuario_nao_validado.save()
+
+    User.objects.create_user(
+        username="usuario_indireta_validado",
+        email="indireta.validado@example.com",
+        cpf="97979797979",
+        cargo=cargo_comum,
+        rede=TipoGestaoChoices.INDIRETA,
+        is_validado=True,
+    )
+
+    api_client.force_authenticate(user=user_gipe_admin)
+    response = api_client.get("/api/users/gestao-usuarios/?pendente_aprovacao=true")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [u["username"] for u in response.data] == ["nao_validado"]
 
 
 # ==========================================
