@@ -38,20 +38,20 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "uuid",               # chave para o frontend
-            "perfil",             # cargo.nome
-            "username",             # cargo.nome
-            "nome",               # name
-            "data_solicitacao",   # data de criação formatada
-            "rf_ou_cpf",          # RF ou CPF formatado
+            "uuid",              
+            "perfil",             
+            "username",             
+            "nome",               
+            "data_solicitacao",   
+            "rf_ou_cpf",          
             "email",
-            "rede",               # label do choices
+            "rede",               
             "diretoria_regional",
             "unidade_educacional",
-            "is_validado",        # útil p/ ícone/badge
+            "is_validado",        
         ]
 
-    # ---------- RF ou CPF ----------
+
     def get_rf_ou_cpf(self, obj) -> str:
         """
         Regra:
@@ -62,7 +62,7 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
             return format_cpf(obj.cpf)
         return obj.username or ""
 
-    # ---------- Rede (label) ----------
+
     def get_rede(self, obj) -> str:
         """
         Usa o display do choices ou '-' se vazio.
@@ -73,7 +73,6 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
             label = obj.rede or ""
         return label or "-"
 
-    # ---------- Diretoria Regional ----------
     def get_diretoria_regional(self, obj):
         """
         Regra:
@@ -81,14 +80,14 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
         - Senão, se tiver unidade escolar com dre associado -> usa unidade.dre.nome.
         - Senão, retorna '-'.
         """
-        # 1) DRE associada diretamente ao usuário
+
         dre_unidade = obj.unidades.filter(
             tipo_unidade=TipoUnidadeChoices.DRE
         ).first()
         if dre_unidade:
             return dre_unidade.nome
 
-        # 2) DRE derivada da unidade escolar
+
         unidade_escolar = obj.unidades.exclude(
             tipo_unidade=TipoUnidadeChoices.DRE
         ).select_related("dre").first()
@@ -98,7 +97,7 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
 
         return "-"
 
-    # ---------- Unidade Educacional ----------
+
     def get_unidade_educacional(self, obj):
         """
         Regra:
@@ -213,7 +212,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
 
         validated_data.setdefault("is_validado", False)
 
-        # Garantir que Ponto Focal não consiga forçar is_app_admin via payload
+
         if not user_request.is_gipe:
             is_app_admin = False
 
@@ -242,7 +241,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
         instance.save()
 
         if unidades is not None:
-            self.validate_unidades(unidades)  # reuso da validação
+            self.validate_unidades(unidades)  
             instance.unidades.set(unidades)
 
         return instance

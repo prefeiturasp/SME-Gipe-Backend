@@ -7,11 +7,6 @@ from apps.unidades.models.unidades import TipoGestaoChoices
 User = get_user_model()
 
 
-
-# ==========================================
-# Testes de Permissão - Anonymous
-# ==========================================
-
 @pytest.mark.django_db
 def test_list_anonymous_negado(api_client):
     """Usuário anônimo não pode listar usuários."""
@@ -31,10 +26,6 @@ def test_create_anonymous_negado(api_client, cargo_comum):
     response = api_client.post("/api/users/gestao-usuarios/", data)
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
-
-# ==========================================
-# Testes de Permissão - Usuário Comum
-# ==========================================
 
 @pytest.mark.django_db
 def test_list_usuario_comum_negado(api_client, user_comum):
@@ -58,10 +49,6 @@ def test_create_usuario_comum_negado(api_client, user_comum, cargo_comum):
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-# ==========================================
-# Testes de get_queryset - GIPE Admin
-# ==========================================
-
 
 @pytest.mark.django_db
 def test_list_gipe_admin_ve_todos_usuarios(
@@ -74,7 +61,6 @@ def test_list_gipe_admin_ve_todos_usuarios(
     assert response.status_code == status.HTTP_200_OK
     usernames = [u["username"] for u in response.data]
 
-    # Deve conter pelo menos os 3 usuários criados
     assert "gipe_admin" in usernames
     assert "usuario_dre_sp" in usernames
     assert "usuario_dre_outra" in usernames
@@ -157,9 +143,6 @@ def test_list_filtra_pendentes_aprovacao_indireta(
     assert [u["username"] for u in response.data] == ["nao_validado"]
 
 
-# ==========================================
-# Teste para cobrir linha 39 do viewset
-# ==========================================
 
 @pytest.mark.django_db
 def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
@@ -169,13 +152,13 @@ def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
     Usuário não-admin que não é GIPE nem PF pode ver apenas seu próprio registro.
     Cobre a linha: return self.queryset.filter(uuid=user.uuid)
     """
-    # Cria usuário comum (não é GIPE nem PF, não é admin)
+
     user_comum = User.objects.create_user(
         username="comum_simples",
         email="comum.simples@example.com",
         cpf="88888888881",
         cargo=cargo_comum,
-        is_app_admin=False,  # Não é admin
+        is_app_admin=False,  
     )
     
     api_client.force_authenticate(user=user_comum)
@@ -186,14 +169,9 @@ def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
     assert response.status_code == status.HTTP_200_OK
     assert response.data["username"] == "comum_simples"
     
-    # Tenta acessar registro de outro usuário (deve falhar)
     response_outro = api_client.get(f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/")
     assert response_outro.status_code == status.HTTP_404_NOT_FOUND
 
-
-# ==========================================
-# Testes de CRUD - Create
-# ==========================================
 
 @pytest.mark.django_db
 def test_create_gipe_admin_cria_usuario(api_client, user_gipe_admin, cargo_comum, escola_sp):
@@ -216,7 +194,6 @@ def test_create_gipe_admin_cria_usuario(api_client, user_gipe_admin, cargo_comum
     assert response.data["username"] == "novo_usuario"
     assert response.data["email"] == "novo.usuario@example.com"
     
-    # Verifica que foi criado no banco
     user = User.objects.get(username="novo_usuario")
     assert user.cpf == "88888888888"
     assert user.cargo.pk == cargo_comum.pk
@@ -267,10 +244,6 @@ def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "detail" in response.data
 
-
-# ==========================================
-# Testes de CRUD - Retrieve
-# ==========================================
 
 @pytest.mark.django_db
 def test_retrieve_gipe_admin_ve_qualquer_usuario(
@@ -339,9 +312,6 @@ def test_partial_update_gipe_admin(api_client, user_gipe_admin, usuario_dre_sp):
     assert response.data["username"] == "usuario_dre_sp"  # Não mudou
 
 
-# ==========================================
-# Testes de CRUD - Delete
-# ==========================================
 
 @pytest.mark.django_db
 def test_delete_gipe_admin_remove_usuario(api_client, user_gipe_admin, usuario_dre_sp):
@@ -353,10 +323,6 @@ def test_delete_gipe_admin_remove_usuario(api_client, user_gipe_admin, usuario_d
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not User.objects.filter(uuid=usuario_dre_sp.uuid).exists()
 
-
-# ==========================================
-# Testes da action aprovar
-# ==========================================
 
 @pytest.mark.django_db
 def test_aprovar_gipe_admin_aprova_usuario(
@@ -380,7 +346,7 @@ def test_aprovar_pf_admin_nao_aprova_usuario_de_outra_dre(
     api_client, user_pf_admin, usuario_nao_validado, escola_outra
 ):
     """PF admin não pode aprovar usuário de outra DRE."""
-    # Associa o usuário não validado a escola de outra DRE
+
     usuario_nao_validado.unidades.clear()
     usuario_nao_validado.unidades.add(escola_outra)
     
@@ -388,7 +354,6 @@ def test_aprovar_pf_admin_nao_aprova_usuario_de_outra_dre(
     
     response = api_client.post(f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/aprovar/")
     
-    # get_queryset filtra por DRE, então retorna 404
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -397,7 +362,6 @@ def test_aprovar_diretor_nao_pode_aprovar(
     api_client, user_diretor, usuario_nao_validado
 ):
     """Diretor não pode aprovar usuários (falta permissão CanApproveUser)."""
-    # Torna diretor admin para passar CanManageUsers
     user_diretor.is_app_admin = True
     user_diretor.save()
     
@@ -425,7 +389,6 @@ def test_aprovar_ja_validado_continua_validado(
     api_client, user_gipe_admin, usuario_dre_sp
 ):
     """Aprovar usuário já validado mantém is_validado=True."""
-    # Garante que usuario_dre_sp está validado
     usuario_dre_sp.is_validado = True
     usuario_dre_sp.save()
     
