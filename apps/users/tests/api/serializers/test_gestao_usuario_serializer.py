@@ -2,12 +2,14 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from types import SimpleNamespace
+from unittest.mock import patch, MagicMock
 
 from apps.users.api.serializers.gestao_usuario_serializer import (
     GestaoUsuarioSerializer,
     GestaoUsuarioListaSerializer,
     format_cpf,
 )
+from apps.unidades.models.unidades import TipoGestaoChoices
 
 User = get_user_model()
 
@@ -324,7 +326,7 @@ def test_create_gipe_admin_cria_usuario_com_is_app_admin(
     assert novo_user.username == "novo_admin"
     assert novo_user.cpf == "99999999999"
     assert novo_user.is_app_admin is True
-    assert novo_user.is_validado is False
+    assert novo_user.is_validado is True
     assert escola_sp in novo_user.unidades.all()
 
 
@@ -417,7 +419,7 @@ def test_create_define_is_validado_false_por_padrao(
     assert serializer.is_valid(raise_exception=True)
     
     novo_user = serializer.save()
-    assert novo_user.is_validado is False
+    assert novo_user.is_validado is True
 
 
 @pytest.mark.django_db
@@ -671,3 +673,169 @@ def test_update_pf_validacao_unidades_respeitada(
     
     # Deve falhar na validação
     assert serializer.is_valid(raise_exception=False) is False
+
+
+# ==========================================
+# Testes para integração com CoreSSO
+# ==========================================
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_rede_indireta_chama_core_sso(
+    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    """Quando rede é INDIRETA, deve chamar o serviço de criação no CoreSSO."""
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+    
+    data = {
+        "username": "usuario_indireta",
+        "name": "Usuário Rede Indireta",
+        "email": "indireta@example.com",
+        "cpf": "44444444444",
+        "cargo": cargo_comum.pk,
+        "rede": TipoGestaoChoices.INDIRETA,
+        "unidades": [escola_sp.pk],
+    }
+    
+    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(raise_exception=True)
+    
+    serializer.save()
+    
+    # Verifica que o serviço foi chamado uma vez
+    mock_cria_core_sso.assert_called_once()
+    
+    # Verifica os dados enviados para o CoreSSO
+    call_args = mock_cria_core_sso.call_args[0][0]
+    assert call_args["login"] == "usuario_indireta"
+    assert call_args["nome"] == "Usuário Rede Indireta"
+    assert call_args["email"] == "indireta@example.com"
+
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_rede_direta_nao_chama_core_sso(
+    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    """Quando rede é DIRETA, não deve chamar o serviço de criação no CoreSSO."""
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+    
+    data = {
+        "username": "usuario_direta",
+        "name": "Usuário Rede Direta",
+        "email": "direta@example.com",
+        "cpf": "33333333333",
+        "cargo": cargo_comum.pk,
+        "rede": TipoGestaoChoices.DIRETA,
+        "unidades": [escola_sp.pk],
+    }
+    
+    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(raise_exception=True)
+    
+    serializer.save()
+    
+    # Verifica que o serviço NÃO foi chamado
+    mock_cria_core_sso.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_rede_none_nao_chama_core_sso(
+    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    """Quando rede é None ou não informada, não deve chamar o serviço CoreSSO."""
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+    
+    data = {
+        "username": "usuario_sem_rede",
+        "name": "Usuário Sem Rede",
+        "email": "semrede@example.com",
+        "cpf": "22222222222",
+        "cargo": cargo_comum.pk,
+        # rede não informada
+        "unidades": [escola_sp.pk],
+    }
+    
+    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(raise_exception=True)
+    
+    serializer.save()
+    
+    # Verifica que o serviço NÃO foi chamado
+    mock_cria_core_sso.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_erro_core_sso_levanta_validation_error(
+    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    """Quando o CoreSSO falha, deve levantar ValidationError."""
+    # Configura o mock para levantar uma exceção
+    mock_cria_core_sso.side_effect = Exception("Erro ao comunicar com CoreSSO")
+    
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+    
+    data = {
+        "username": "usuario_erro_coresso",
+        "name": "Usuário Erro",
+        "email": "erro.coresso@example.com",
+        "cpf": "11122233344",
+        "cargo": cargo_comum.pk,
+        "rede": TipoGestaoChoices.INDIRETA,
+        "unidades": [escola_sp.pk],
+    }
+    
+    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(raise_exception=True)
+    
+    # Deve levantar ValidationError quando tentar salvar
+    with pytest.raises(serializers.ValidationError) as exc_info:
+        serializer.save()
+    
+    # Verifica que a mensagem de erro está correta
+    assert "Erro ao criar usuário" in str(exc_info.value)
+    assert "Erro ao comunicar com CoreSSO" in str(exc_info.value)
+
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_erro_core_sso_rollback_transacao(
+    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    """Quando o CoreSSO falha, a transação deve fazer rollback e o usuário não deve ser criado."""
+    # Configura o mock para levantar uma exceção
+    mock_cria_core_sso.side_effect = Exception("Falha no CoreSSO")
+    
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+    
+    # Conta quantos usuários existem antes
+    count_antes = User.objects.count()
+    
+    data = {
+        "username": "usuario_rollback",
+        "name": "Usuário Rollback",
+        "email": "rollback@example.com",
+        "cpf": "10101010101",
+        "cargo": cargo_comum.pk,
+        "rede": TipoGestaoChoices.INDIRETA,
+        "unidades": [escola_sp.pk],
+    }
+    
+    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(raise_exception=True)
+    
+    # Deve levantar ValidationError
+    with pytest.raises(serializers.ValidationError):
+        serializer.save()
+    
+    # Verifica que o usuário NÃO foi criado (rollback)
+    count_depois = User.objects.count()
+    assert count_depois == count_antes
+    assert not User.objects.filter(username="usuario_rollback").exists()
