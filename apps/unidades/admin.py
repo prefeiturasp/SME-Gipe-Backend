@@ -11,6 +11,7 @@ class UnidadeAdmin(admin.ModelAdmin):
         'tipo_unidade',
         'rede',
         'dre',
+        'uuid',
     )
     list_filter = (
         'tipo_unidade',
