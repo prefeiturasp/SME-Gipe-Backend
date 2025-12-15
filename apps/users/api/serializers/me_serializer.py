@@ -23,6 +23,7 @@ class UserMeSerializer(serializers.ModelSerializer):
             "rede",
             "is_core_sso",
             "is_validado",
+            "is_app_admin",
             "perfil_acesso",
             "unidades",
         )
@@ -38,34 +39,35 @@ class UserMeSerializer(serializers.ModelSerializer):
 
     def get_unidades(self, obj):
         unidades = obj.unidades.select_related("dre").all()
-        resultado = []
+        return [self._format_unidade(unidade) for unidade in unidades]
 
-        for u in unidades:
-            if u.tipo_unidade == "DRE":
-                resultado.append({
-                    "ue": {
-                        "codigo_eol": None,
-                        "nome": None,
-                        "sigla": None,
-                    },
-                    "dre": {
-                        "codigo_eol": u.codigo_eol,
-                        "nome": u.nome,
-                        "sigla": u.sigla,
-                    }
-                })
-            else:
-                resultado.append({
-                    "ue": {
-                        "codigo_eol": u.codigo_eol,
-                        "nome": u.nome,
-                        "sigla": u.sigla,
-                    },
-                    "dre": {
-                        "codigo_eol": u.dre.codigo_eol if u.dre else None,
-                        "nome": u.dre.nome if u.dre else None,
-                        "sigla": u.dre.sigla if u.dre else None,
-                    }
-                })
-                
-        return resultado
+    def _format_unidade(self, unidade):
+        return {
+            "ue": self._format_ue(unidade),
+            "dre": self._format_dre(unidade),
+        }
+
+    def _format_ue(self, unidade):
+        if unidade.tipo_unidade == "DRE":
+            return {
+                "ue_uuid": None,
+                "codigo_eol": None,
+                "nome": None,
+                "sigla": None,
+            }
+
+        return {
+            "ue_uuid": unidade.uuid,
+            "codigo_eol": unidade.codigo_eol,
+            "nome": unidade.nome,
+            "sigla": unidade.sigla,
+        }
+
+    def _format_dre(self, unidade):
+        dre = unidade if unidade.tipo_unidade == "DRE" else unidade.dre
+        return {
+            "dre_uuid": getattr(dre, "uuid", None),
+            "codigo_eol": getattr(dre, "codigo_eol", None),
+            "nome": getattr(dre, "nome", None),
+            "sigla": getattr(dre, "sigla", None),
+        }

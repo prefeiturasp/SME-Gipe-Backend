@@ -11,7 +11,7 @@ class TestCargosService:
     @patch("apps.users.services.cargos_service.env")
     @patch("apps.users.services.cargos_service.requests.get")
     def test_get_cargos_sucesso(self, mock_get, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -27,7 +27,7 @@ class TestCargosService:
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.get")
     def test_get_cargos_usuario_nao_encontrado(self, mock_get, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
         mock_response = MagicMock()
         mock_response.status_code = 401
         mock_get.return_value = mock_response
@@ -38,7 +38,7 @@ class TestCargosService:
     @patch("apps.users.services.cargos_service.env")
     @patch("apps.users.services.cargos_service.requests.get")
     def test_get_cargos_erro_http(self, mock_get, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_get.return_value = mock_response
@@ -49,7 +49,7 @@ class TestCargosService:
     @patch("apps.users.services.cargos_service.env")
     @patch("apps.users.services.cargos_service.requests.get", side_effect=Exception("Erro inesperado"))
     def test_get_cargos_erro_inesperado(self, mock_get, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         with pytest.raises(Exception, match="Erro inesperado"):
             CargosService.get_cargos("123456", "João")
@@ -57,7 +57,7 @@ class TestCargosService:
     @patch("apps.users.services.cargos_service.env")
     @patch("apps.users.services.cargos_service.requests.get", side_effect=requests.exceptions.RequestException("Timeout"))
     def test_get_cargos_request_exception(self, mock_get, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         with pytest.raises(Exception, match="Erro de comunicação com sistema de cargos: Timeout"):
             CargosService.get_cargos("123456", "João")

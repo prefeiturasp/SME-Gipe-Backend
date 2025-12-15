@@ -100,7 +100,7 @@ class UserAdmin(BaseUserAdmin):
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {
-            'fields': ('name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades', 'is_validado')
+            'fields': ('name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades', 'is_validado', 'is_app_admin', 'is_core_sso')
         }),
     )
     # Configuração dos fieldsets para criação

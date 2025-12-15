@@ -3,14 +3,13 @@ import requests
 from unittest.mock import patch, MagicMock
 from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException, InternalError
 from apps.users.services.login_service import AutenticacaoService
-from apps.users.models import User
 
 class TestAutenticacaoService:
 
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post")
     def test_autenticacao_sucesso(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"login": "usuario123", "nome": "Usuário Teste"}
@@ -24,7 +23,7 @@ class TestAutenticacaoService:
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post")
     def test_autenticacao_falha_status_code(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
         mock_response = MagicMock()
         mock_response.status_code = 401
         mock_post.return_value = mock_response
@@ -35,7 +34,7 @@ class TestAutenticacaoService:
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post", side_effect=Exception("Erro inesperado"))
     def test_erro_inesperado(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         with pytest.raises(InternalError, match="Erro interno: Erro inesperado"):
             AutenticacaoService.autentica("usuario123", "senha")
@@ -43,7 +42,7 @@ class TestAutenticacaoService:
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post", side_effect=Exception("Falha de rede"))
     def test_erro_requisicao(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         with pytest.raises(InternalError) as exc:
             AutenticacaoService.autentica("usuario123", "senha")
@@ -53,7 +52,7 @@ class TestAutenticacaoService:
     @patch("apps.users.services.login_service.env")
     @patch("apps.users.services.login_service.requests.post", side_effect=requests.exceptions.RequestException("Timeout"))
     def test_erro_requests_exception(self, mock_post, mock_env):
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         with pytest.raises(SmeIntegracaoException, match="Erro de comunicação: Timeout"):
             AutenticacaoService.autentica("usuario123", "senha")
@@ -62,7 +61,7 @@ class TestAutenticacaoService:
     @patch("apps.users.services.login_service.requests.post")
     def test_autenticacao_service_erro_http_500(self, mock_post, mock_env):
         """Deve levantar SmeIntegracaoException quando a API externa retornar 500"""
-        mock_env.return_value = "http://fake-api"
+        mock_env.return_value = "https://fake-api"
 
         mock_response = MagicMock()
         mock_response.status_code = 500

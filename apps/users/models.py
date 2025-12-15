@@ -31,6 +31,19 @@ class User(AbstractUser):
     )
     is_validado = models.BooleanField("Validado", default=False, help_text="Indica se o usuário foi validado")
     is_core_sso = models.BooleanField("CoreSSO", default=False, help_text="Indica se o usuário possue cadastro no coreSSO")
+    
+    
+    # mapeamento dos códigos de cargo para facilitar as permissões
+    PERFIL_GIPE = 0        # ajuste para o código real no Cargo
+    PERFIL_PONTO_FOCAL = 1 # ajuste para o código real
+    PERFIL_DIRETOR = 3360     # ajuste para o código real
+
+    
+    is_app_admin = models.BooleanField(
+        "Administrador GIPE",
+        default=False,
+        help_text="Indica se o usuário é administrador funcional do GIPE"
+    )
                               
     class Meta:
         verbose_name = "Usuário"
@@ -49,6 +62,21 @@ class User(AbstractUser):
             self.set_password(self.password)
 
         super().save(*args, **kwargs)
+
+    def _has_cargo_code(self, code: int) -> bool:
+        return getattr(self.cargo, "codigo", None) == code
+
+    @property
+    def is_gipe(self) -> bool:
+        return self._has_cargo_code(self.PERFIL_GIPE)
+
+    @property
+    def is_ponto_focal(self) -> bool:
+        return self._has_cargo_code(self.PERFIL_PONTO_FOCAL)
+
+    @property
+    def is_diretor(self) -> bool:
+        return self._has_cargo_code(self.PERFIL_DIRETOR)
  
 
 class Cargo(models.Model):

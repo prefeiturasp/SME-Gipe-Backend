@@ -8,14 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Diretório da aplicação
 WORKDIR /app
 
-# Instala dependências do sistema
+# Instala dependências do sistema, copia requirements e instala dependências Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc build-essential libpq-dev \
+    build-essential gcc libpq-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copiar toda a pasta de requirements
 COPY requirements/ requirements/
-RUN pip install --no-cache-dir -r requirements/production.txt
 
 # Instala as dependências a partir do arquivo de produção
 RUN pip install --no-cache-dir -r requirements/production.txt

@@ -1,9 +1,11 @@
+import secrets
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.serializers import ValidationError
 from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
 from apps.users.api.serializers.usuario_serializer import UserCreateSerializer
 from apps.users.models import Cargo
+from rest_framework.test import APIClient
 
 User = get_user_model()
 
@@ -20,9 +22,10 @@ def unidade():
 
 @pytest.fixture
 def user_data(unidade, cargo):
+    pwd = secrets.token_urlsafe(16)
     return {
         'username': 'novousuario',
-        'password': 'senha123',
+        'password': pwd,
         'name': 'Novo Usuário',
         'email': 'novo@sme.prefeitura.sp.gov.br',
         'cpf': '12345678901',
@@ -34,15 +37,30 @@ def user_data(unidade, cargo):
 
 @pytest.fixture
 def existing_user(cargo):
-    return User.objects.create_user(
-        username='usuarioexistente',
-        password='senha123',
-        name='Usuário Existente',
-        email='existente@sme.prefeitura.sp.gov.br',
-        cpf='11122233344',
-        cargo=cargo,
-        rede=TipoGestaoChoices.DIRETA,
-    )
+    pwd = secrets.token_urlsafe(16)
+    user = User.objects.create_user(username='usuarioexistente')
+    user.set_password(pwd)
+    user.cargo = cargo
+    user.name = 'Usuário Existente'
+    user.email = 'existente@sme.prefeitura.sp.gov.br'
+    user.cpf = '11122233344'
+    user.rede = TipoGestaoChoices.DIRETA
+    user.save()
+    return user
+
+
+@pytest.fixture
+def api_client(existing_user):
+    def _create(user=None):
+        if not user:
+            pwd = secrets.token_urlsafe(16)
+            user = User.objects.create_user(username="tester")
+            user.set_password(pwd)
+            user.save()
+        client = APIClient()
+        client.force_authenticate(user=user)
+        return client
+    return _create
 
 
 @pytest.mark.django_db
