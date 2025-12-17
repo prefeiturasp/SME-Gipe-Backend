@@ -22,7 +22,7 @@ class TestSenhaService:
         assert isinstance(token, str)
  
     def test_gerar_token_para_reset_success(self):
-        user = User.objects.create(
+        User.objects.create(
                     username='1234567',
                     email='test@example.com',
                     name='Test User'

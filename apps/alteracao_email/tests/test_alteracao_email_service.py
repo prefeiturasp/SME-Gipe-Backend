@@ -1,4 +1,5 @@
 import uuid
+import secrets
 import pytest
 from unittest.mock import patch
 from django.http import Http404
@@ -12,13 +13,18 @@ from apps.alteracao_email.services.alteracao_email_service import AlteracaoEmail
 
 @pytest.fixture
 def user(db):
-    return User.objects.create_user(
-        username="teste",
-        email="usuario@sme.prefeitura.sp.gov.br",
-        password="senha123",
-        cpf="12345678900",
-        name="Usuário Teste",
-    )
+    def _create(username="teste"):
+        pwd = secrets.token_urlsafe(16)
+        user = User.objects.create_user(
+            username=username,
+            email="usuario@sme.prefeitura.sp.gov.br",
+            cpf="12345678900",
+            name="Usuário Teste",
+        )
+        user.set_password(pwd)
+        user.save()
+        return user
+    return _create()
 
 
 @pytest.mark.django_db

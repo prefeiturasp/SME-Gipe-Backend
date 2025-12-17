@@ -38,7 +38,7 @@ class LoginView(TokenObtainPairView):
             )
 
         login = serializer.validated_data["username"]
-        senha = serializer.validated_data["password"]
+        senha = serializer.validated_data["secret_pass"]
         
         try:
             auth_data = self._authenticate_user(login, senha)
@@ -185,6 +185,9 @@ class LoginView(TokenObtainPairView):
 
         refresh["username"] = user.username
         refresh["name"] = getattr(user, "name", "") or ""
+        refresh["cpf"] = getattr(user, "cpf", "") or ""
+        refresh["email"] = getattr(user, "email", "") or ""
+        refresh["is_app_admin"] = getattr(user, "is_app_admin", False) or False
         if getattr(user, "cargo", None):
             refresh["perfil_codigo"] = user.cargo.codigo
             refresh["perfil_nome"] = user.cargo.nome
@@ -193,6 +196,9 @@ class LoginView(TokenObtainPairView):
         access = refresh.access_token
         access["username"] = user.username
         access["name"] = getattr(user, "name", "") or ""
+        access["cpf"] = getattr(user, "cpf", "") or ""
+        access["email"] = getattr(user, "email", "") or ""
+        access["is_app_admin"] = getattr(user, "is_app_admin", False) or False
         if getattr(user, "cargo", None):
             access["perfil_codigo"] = user.cargo.codigo
             access["perfil_nome"] = user.cargo.nome

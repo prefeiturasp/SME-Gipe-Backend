@@ -1,3 +1,4 @@
+import secrets
 import pytest
 import uuid as uuid_lib
 
@@ -6,7 +7,11 @@ from rest_framework.test import APIClient
 
 from django.contrib.auth import get_user_model
 
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
+from apps.unidades.models.unidades import (
+    Unidade,
+    TipoUnidadeChoices,
+    TipoGestaoChoices,
+)
 
 User = get_user_model()
 
@@ -17,13 +22,28 @@ def api_client():
 
 
 @pytest.fixture
-def usuario(dre, ue_indireta):
-    user = User.objects.create_user(
+def user_factory(db):
+    def _create_user(
         username="testeuser",
-        password="senha123",
         cpf="12345678901",
-        name="Usuário Teste"
-    )
+        name="Usuário Teste",
+    ):
+        pwd = secrets.token_urlsafe(16)
+        user = User.objects.create_user(
+            username=username,
+            cpf=cpf,
+            name=name,
+        )
+        user.set_password(pwd)
+        user.save()
+        return user
+
+    return _create_user
+
+
+@pytest.fixture
+def usuario(user_factory, dre, ue_indireta):
+    user = user_factory()
     user.unidades.add(ue_indireta)
     return user
 
@@ -36,7 +56,7 @@ def dre():
         nome="DRE Teste",
         sigla="DRE",
         tipo_unidade=TipoUnidadeChoices.DRE,
-        rede=TipoGestaoChoices.INDIRETA
+        rede=TipoGestaoChoices.INDIRETA,
     )
 
 
@@ -49,7 +69,7 @@ def ue_indireta(dre):
         sigla="UE",
         tipo_unidade=TipoUnidadeChoices.CEI,
         rede=TipoGestaoChoices.INDIRETA,
-        dre=dre
+        dre=dre,
     )
 
 
@@ -62,7 +82,7 @@ def ue_direta(dre):
         sigla="UE",
         tipo_unidade=TipoUnidadeChoices.CEI,
         rede=TipoGestaoChoices.DIRETA,
-        dre=dre
+        dre=dre,
     )
 
 
@@ -103,3 +123,57 @@ class TestUnidadeViewSet:
         assert "DRE Teste" in nomes
         assert "UE Indireta" in nomes
         assert "UE Direta" in nomes
+
+    def test_listar_ues_rede_todas(self, api_client, dre, ue_indireta, ue_direta):
+        response = api_client.get(f"/api/unidades/?tipo=UE&dre={dre.uuid}&rede=TODAS")
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+        assert "UE Indireta" in nomes
+        assert "UE Direta" in nomes
+
+    def test_listar_ues_rede_direta(self, api_client, dre, ue_indireta, ue_direta):
+        response = api_client.get(f"/api/unidades/?tipo=UE&dre={dre.uuid}&rede=DIRETA")
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+        assert "UE Direta" in nomes
+        assert "UE Indireta" not in nomes
+
+    def test_listar_ues_rede_indireta(self, api_client, dre, ue_indireta, ue_direta):
+        response = api_client.get(
+            f"/api/unidades/?tipo=UE&dre={dre.uuid}&rede=INDIRETA"
+        )
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+        assert "UE Indireta" in nomes
+        assert "UE Direta" not in nomes
+
+    def test_listar_ues_rede_invalida(self, api_client, dre):
+        response = api_client.get(
+            f"/api/unidades/?tipo=UE&dre={dre.uuid}&rede=INVALIDA"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "detail" in response.data
+
+    def test_batch_sucesso(self, api_client, dre, ue_indireta, ue_direta):
+        codigos = [dre.codigo_eol, ue_indireta.codigo_eol]
+        response = api_client.post(
+            "/api/unidades/batch/", {"codigos": codigos}, format="json"
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert str(dre.codigo_eol) in response.data
+        assert str(ue_indireta.codigo_eol) in response.data
+        assert str(ue_direta.codigo_eol) not in response.data
+
+    def test_batch_codigos_vazio(self, api_client):
+        response = api_client.post(
+            "/api/unidades/batch/", {"codigos": []}, format="json"
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {}
+
+    def test_batch_codigos_nao_lista(self, api_client):
+        response = api_client.post(
+            "/api/unidades/batch/", {"codigos": "nao-lista"}, format="json"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["detail"] == "Campo 'codigos' deve ser uma lista."

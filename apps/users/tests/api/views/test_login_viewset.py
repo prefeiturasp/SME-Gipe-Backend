@@ -1,11 +1,30 @@
 import pytest
-from rest_framework.test import APIRequestFactory
-from rest_framework import status
+import secrets
 from unittest.mock import patch, MagicMock
+from django.db import IntegrityError, DatabaseError
+
+from rest_framework import status
+from rest_framework.test import APIRequestFactory, APIClient
+
+from apps.users.models import User, Cargo
+from apps.constants import LOGIN_PASS_FIELD
 from apps.users.api.views.login_viewset import LoginView
 from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException
-from django.db import IntegrityError, DatabaseError
-from apps.users.models import User, Cargo
+
+
+DUMMY_PASS = secrets.token_urlsafe(16)
+
+@pytest.fixture
+def authenticated_client(django_user_model):
+    def _create(username="tester"):
+        pwd = secrets.token_urlsafe(16)
+        user = django_user_model.objects.create_user(username=username)
+        user.set_password(pwd)
+        user.save()
+        client = APIClient()
+        client.force_authenticate(user=user)
+        return client, user, pwd
+    return _create
 
 
 class TestLoginView:
@@ -33,7 +52,7 @@ class TestLoginView:
         mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha123"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -44,7 +63,7 @@ class TestLoginView:
 
     def test_login_sem_credenciais(self):
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "", "password": ""}, format='json')
+        request = factory.post("/api/login", {"username": "", LOGIN_PASS_FIELD: ""}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -54,7 +73,7 @@ class TestLoginView:
     @patch("apps.users.services.login_service.AutenticacaoService.autentica", side_effect=AuthenticationError("Credenciais inválidas"))
     def test_login_credenciais_invalidas(self, mock_autentica):
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha_errada"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: "123"}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -76,7 +95,7 @@ class TestLoginView:
         mock_get_cargos.return_value = {"cargos": [{"codigo": 40, "nome": "Professor"}]}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -86,13 +105,12 @@ class TestLoginView:
     @patch("apps.users.services.login_service.AutenticacaoService.autentica", side_effect=Exception("Erro inesperado"))
     def test_erro_interno(self, mock_autentica):
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         response = LoginView.as_view()(request)
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data["detail"] == "Erro interno do sistema. Tente novamente mais tarde."
-
 
     @pytest.mark.django_db
     @patch("apps.users.models.User.objects.update_or_create")
@@ -109,7 +127,7 @@ class TestLoginView:
 
         view = LoginView()
 
-        senha = "senha123"
+        pwd = DUMMY_PASS
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
@@ -121,7 +139,7 @@ class TestLoginView:
             "nome": "Cargo Teste",
         }
 
-        user = view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
+        user = view.create_or_update_user_with_cargo(auth_data["login"], pwd, auth_data, cargo_data)
 
         assert user == mock_user
         mock_cargo_update_or_create.assert_called_once_with(
@@ -130,11 +148,10 @@ class TestLoginView:
         mock_user_filter.assert_called_once_with(username="usuario1")
         mock_user_update_or_create.assert_called_once()
 
-
     @patch("apps.users.models.Cargo.objects.update_or_create", side_effect=Exception("Erro inesperado no DB"))
     def test_create_or_update_user_with_cargo_db_error(self, mock_cargo_update_or_create):
         view = LoginView()
-        senha = "senha123"
+        pwd = DUMMY_PASS
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
@@ -147,7 +164,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], pwd, auth_data, cargo_data)
 
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
@@ -158,7 +175,7 @@ class TestLoginView:
         mock_cargo_update_or_create.side_effect = IntegrityError("Integrity error")
 
         view = LoginView()
-        senha = "senha123"
+        pwd = DUMMY_PASS
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
@@ -171,7 +188,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], pwd, auth_data, cargo_data)
 
         assert "Erro de integridade ao salvar os dados" in str(excinfo.value)
 
@@ -182,7 +199,7 @@ class TestLoginView:
         mock_cargo_update_or_create.side_effect = DatabaseError("Database error")
 
         view = LoginView()
-        senha = "senha123"
+        pwd = DUMMY_PASS
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
@@ -195,7 +212,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], pwd, auth_data, cargo_data)
 
         assert "Erro no banco de dados" in str(excinfo.value)
 
@@ -206,7 +223,7 @@ class TestLoginView:
         mock_cargo_update_or_create.side_effect = Exception("Unexpected error")
 
         view = LoginView()
-        senha = "senha123"
+        pwd = DUMMY_PASS
         auth_data = {
             "login": "usuario1",
             "nome": "Usuário Teste",
@@ -219,7 +236,7 @@ class TestLoginView:
         }
 
         with pytest.raises(Exception) as excinfo:
-            view.create_or_update_user_with_cargo(auth_data["login"], senha, auth_data, cargo_data)
+            view.create_or_update_user_with_cargo(auth_data["login"], pwd, auth_data, cargo_data)
 
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
@@ -283,7 +300,7 @@ class TestLoginView:
         mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -318,7 +335,7 @@ class TestLoginView:
         mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         response = LoginView.as_view()(request)
 
@@ -333,47 +350,45 @@ class TestCargoAlternativo:
         self.view = LoginView()
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_sucesso(self):
+    def test_get_cargo_gipe_ou_ponto_focal_sucesso(self, authenticated_client):
         cargo_real = Cargo.objects.create(nome='GIPE', codigo=0)
-        usuario = User.objects.create_user(username='testeuser', password='teste123')
+
+        _, usuario, _ = authenticated_client("testeuser")
         usuario.cargo = cargo_real
         usuario.save()
 
-        view = LoginView()
         with patch("apps.users.api.views.login_viewset.User.objects.get", return_value=usuario):
-            result = view._get_cargo_gipe_ou_ponto_focal('testeuser')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('testeuser')
 
         assert result == {'codigo': 0, 'nome': 'GIPE'}
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_nao_encontrado(self):
-        view = LoginView()
+    def test_get_cargo_gipe_ou_ponto_focal_nao_encontrado(self, authenticated_client):
         with patch("apps.users.api.views.login_viewset.User.objects.get", side_effect=User.DoesNotExist):
-            result = view._get_cargo_gipe_ou_ponto_focal('naoexiste')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('naoexiste')
 
         assert result is None
 
     @pytest.mark.django_db
-    def test_get_cargo_gipe_ou_ponto_focal_usuario_sem_cargo_valido(self):
+    def test_get_cargo_gipe_ou_ponto_focal_usuario_sem_cargo_valido(self, authenticated_client):
         cargo_real = Cargo.objects.create(nome='Outro Cargo', codigo=2)
-        usuario = User.objects.create_user(username='usuario', password='teste123')
+        _, usuario, _ = authenticated_client("usuario")
         usuario.cargo = cargo_real
         usuario.save()
 
-        view = LoginView()
         with patch("apps.users.api.views.login_viewset.User.objects.get", return_value=usuario):
-            result = view._get_cargo_gipe_ou_ponto_focal('usuario')
+            result = self.view._get_cargo_gipe_ou_ponto_focal('usuario')
 
         assert result is None
 
     @pytest.mark.django_db
     @patch("apps.users.api.views.login_viewset.AutenticacaoService.autentica")
-    def test_login_view_sme_integracao_exception(self, mock_autentica):
+    def test_login_view_sme_integracao_exception(self, mock_autentica, authenticated_client):
         """Deve retornar 400 quando o serviço externo estiver fora do ar"""
         mock_autentica.side_effect = SmeIntegracaoException("Erro de comunicação com CoreSSO")
 
         factory = APIRequestFactory()
-        request = factory.post("/api/login", {"username": "1234567", "password": "senha123"}, format='json')
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
 
         view = LoginView.as_view()
         response = view(request)
