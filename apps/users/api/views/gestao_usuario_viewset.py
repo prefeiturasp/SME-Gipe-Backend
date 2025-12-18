@@ -7,7 +7,7 @@ from rest_framework import status
 
 from django.contrib.auth import get_user_model
 
-from apps.users.api.serializers.gestao_usuario_serializer import GestaoUsuarioListaSerializer, GestaoUsuarioSerializer
+from apps.users.api.serializers.gestao_usuario_serializer import GestaoUsuarioListaSerializer, GestaoUsuarioSerializer, GestaoUsuarioRetrieveSerializer
 from apps.users.permissions import CanManageUsers, CanApproveUser
 from apps.unidades.models.unidades import TipoUnidadeChoices, TipoGestaoChoices
 
@@ -28,9 +28,11 @@ class GestaoUsuarioViewSet(ModelViewSet):
     lookup_field = "uuid"
     
     def get_serializer_class(self):
-
+        
         if self.action == "list":
             return GestaoUsuarioListaSerializer
+        elif self.action == "retrieve":
+            return GestaoUsuarioRetrieveSerializer
 
         return GestaoUsuarioSerializer
     

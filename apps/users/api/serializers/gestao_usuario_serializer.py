@@ -265,3 +265,31 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             instance.unidades.set(unidades)
 
         return instance
+    
+
+class GestaoUsuarioRetrieveSerializer(GestaoUsuarioSerializer):
+    """
+    Serializer para exibir detalhes completos do usuário.
+    """
+    is_active = serializers.BooleanField(read_only=True)
+    codigo_eol_unidade = serializers.SerializerMethodField()
+    codigo_eol_dre_da_unidade = serializers.SerializerMethodField()
+
+    class Meta(GestaoUsuarioSerializer.Meta):
+        fields = GestaoUsuarioSerializer.Meta.fields + [
+            "is_active",
+            "codigo_eol_unidade",
+            "codigo_eol_dre_da_unidade",
+        ]
+
+    def get_codigo_eol_unidade(self, obj):
+        primeira_unidade = obj.unidades.first()
+        if primeira_unidade:
+            return primeira_unidade.codigo_eol
+        return None
+
+    def get_codigo_eol_dre_da_unidade(self, obj):
+        primeira_unidade = obj.unidades.first()
+        if primeira_unidade and primeira_unidade.dre_id:
+            return primeira_unidade.dre_id
+        return None
