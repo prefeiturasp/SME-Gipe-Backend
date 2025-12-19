@@ -1,17 +1,21 @@
+import environ
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-
-from rest_framework.viewsets import ModelViewSet
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status
-
-from django.contrib.auth import get_user_model
+from rest_framework.viewsets import ModelViewSet
 
 from apps.users.api.serializers.gestao_usuario_serializer import GestaoUsuarioListaSerializer, GestaoUsuarioSerializer, GestaoUsuarioRetrieveSerializer
 from apps.users.permissions import CanManageUsers, CanApproveUser
 from apps.unidades.models.unidades import TipoUnidadeChoices, TipoGestaoChoices
 
+from apps.users.services.envia_email_service import EnviaEmailService
+from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
+
 User = get_user_model()
+env = environ.Env()
 
 
 class GestaoUsuarioViewSet(ModelViewSet):
@@ -93,8 +97,62 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
     @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
     def aprovar(self, request, uuid=None):
+
         usuario = self.get_object()
+
+        if usuario.is_validado:
+            return Response(
+                {"detail": "Usuário já está aprovado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            dados_usuario = {
+                "login": usuario.username,
+                "nome": usuario.name,
+                "email": usuario.email,
+            }
+
+            CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario)
+
+        except Exception:
+            return Response(
+                {"detail": "Erro ao criar o usuário no Core SSO."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        contexto_email = {
+            "nome_usuario": usuario.name,
+            "aplicacao_url": env("FRONTEND_URL"),
+            "senha": env("BASE_CORESSO_AUTH"),
+        }
+        
+        EnviaEmailService.enviar(
+            destinatario=usuario.email,
+            assunto="Seu acesso ao GIPE foi aprovado!",
+            template_html="emails/cadastro_aprovado.html",
+            contexto=contexto_email,
+        )
+
         usuario.is_validado = True
-        usuario.save(update_fields=["is_validado"])
+        usuario.data_aprovacao = timezone.now()
+        usuario.responsavel_aprovacao = str(request.user)
+
+        usuario.save(
+            update_fields=[
+                "is_validado",
+                "data_aprovacao",
+                "responsavel_aprovacao"
+            ]
+        )
+
+        usuario = self.get_object() # Atualiza a instancia
         serializer = self.get_serializer(usuario)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(
+            {
+                "detail": "Usuário aprovado com sucesso.",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
