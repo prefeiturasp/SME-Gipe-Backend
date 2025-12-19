@@ -157,6 +157,21 @@ class TestGestaoUnidadeViewSetList:
         assert response.data[0]["uuid"] == str(escola_sp.uuid)
         uuids = {item["uuid"] for item in response.data}
         assert str(escola_outra.uuid) not in uuids
+        
+    def test_tipos_unidade_endpoint(
+        self, api_client, user_gipe_admin
+    ):
+        """Endpoint tipos-unidade retorna todas as opções de tipo de unidade."""
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-tipos-unidade")
+
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        tipos_retorno = {item["id"]: item["label"] for item in response.data}
+        for choice in TipoUnidadeChoices.choices:
+            assert choice[0] in tipos_retorno
+            assert tipos_retorno[choice[0]] == choice[1]
 
     
 @pytest.mark.django_db
