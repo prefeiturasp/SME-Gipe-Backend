@@ -86,6 +86,78 @@ class TestGestaoUnidadeViewSetList:
         assert "dre_nome" in response.data[0]
         assert "dre_uuid" in response.data[0]
 
+    def test_list_filtra_por_dre(
+        self, api_client, user_gipe_admin, dre_sp, escola_sp, escola_outra
+    ):
+        """Aplica filtro por DRE retornando apenas unidades vinculadas a ela."""
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-list")
+
+        response = api_client.get(url, {"dre": str(dre_sp.uuid)})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 1
+        assert response.data[0]["dre_uuid"] == str(dre_sp.uuid)
+        assert response.data[0]["uuid"] == str(escola_sp.uuid)
+        uuids = {item["uuid"] for item in response.data}
+        assert str(escola_outra.uuid) not in uuids
+
+    def test_list_filtra_por_rede(
+        self, api_client, user_gipe_admin, dre_sp, escola_sp
+    ):
+        """Filtra unidades por rede."""
+        Unidade.objects.create(
+            codigo_eol="400000",
+            nome="EMEF Parceira",
+            tipo_unidade=TipoUnidadeChoices.EMEF,
+            rede="INDIRETA",
+            dre=dre_sp,
+        )
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-list")
+
+        response = api_client.get(url, {"rede": "INDIRETA"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 1
+        assert response.data[0]["rede"] == "INDIRETA"
+        assert response.data[0]["nome"] == "EMEF Parceira"
+
+    def test_list_filtra_por_tipo_unidade(
+        self, api_client, user_gipe_admin, dre_sp, dre_outra, escola_sp
+    ):
+        """Filtra unidades por tipo."""
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-list")
+
+        response = api_client.get(url, {"tipo_unidade": TipoUnidadeChoices.DRE})
+
+        assert response.status_code == status.HTTP_200_OK
+        retornados = {item["uuid"] for item in response.data}
+        assert retornados == {str(dre_sp.uuid), str(dre_outra.uuid)}
+        assert all(
+            item["tipo_unidade"] == TipoUnidadeChoices.DRE for item in response.data
+        )
+
+    def test_list_filtra_por_ativa_false(
+        self, api_client, user_gipe_admin, escola_sp, escola_outra
+    ):
+        """Filtra unidades ativas/inativas considerando strings truthy/falsy."""
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-list")
+
+        response = api_client.get(url, {"ativa": "false"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 1
+        assert response.data[0]["uuid"] == str(escola_sp.uuid)
+        uuids = {item["uuid"] for item in response.data}
+        assert str(escola_outra.uuid) not in uuids
+
     
 @pytest.mark.django_db
 class TestGestaoUnidadeViewSetRetrieve:
@@ -642,5 +714,4 @@ class TestGestaoUnidadeViewSetInativar:
         response = api_client.post(url)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-
 
