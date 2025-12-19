@@ -77,3 +77,8 @@ class GestaoUnidadeViewSet(ModelViewSet):
         return Response(
             {"detail": "Unidade inativada com sucesso."}, status=status.HTTP_200_OK
         )
+        
+    @action(detail=False, methods=['get'], url_path='tipos-unidade')
+    def tipos_unidade(self, _):
+        tipos = [{"id": choice[0], "label": choice[1]} for choice in TipoUnidadeChoices.choices]
+        return Response(tipos, status=status.HTTP_200_OK)
