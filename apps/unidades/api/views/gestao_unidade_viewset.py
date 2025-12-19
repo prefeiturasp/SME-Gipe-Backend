@@ -12,9 +12,9 @@ from apps.unidades.api.serializers.gestao_unidade_serializer import (
 
 class GestaoUnidadeViewSet(ModelViewSet):
 
-    queryset = Unidade.objects.select_related("dre")
+    queryset = Unidade.objects.select_related("dre").order_by("nome")
     lookup_field = "uuid"
-
+    
     def get_serializer_class(self):
         if self.action == "list" or self.action == "retrieve":
             return GestaoUnidadeListaSerializer
@@ -22,7 +22,8 @@ class GestaoUnidadeViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-
+        params = self.request.query_params
+        
         qs = self.queryset
 
         if user.is_gipe:
@@ -38,6 +39,24 @@ class GestaoUnidadeViewSet(ModelViewSet):
 
         else:
             base_qs = qs.none()
+            
+         # Filtros
+        dre_uuid = params.get("dre")
+        if dre_uuid:
+            base_qs = base_qs.filter(dre__uuid=dre_uuid)
+
+        rede = params.get("rede")
+        if rede:
+            base_qs = base_qs.filter(rede=rede)
+
+        tipo = params.get("tipo_unidade")
+        if tipo:
+            base_qs = base_qs.filter(tipo_unidade=tipo)
+
+        ativa = params.get("ativa")
+        if ativa is not None:
+            ativa_bool = str(ativa).lower() in ["true", "1", "t", "yes", "sim"]
+            base_qs = base_qs.filter(ativa=ativa_bool)
 
         return base_qs
 

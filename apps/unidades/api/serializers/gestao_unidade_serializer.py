@@ -131,6 +131,7 @@ class GestaoUnidadeListaSerializer(serializers.ModelSerializer):
     rede_label = serializers.CharField(source="get_rede_display", read_only=True)
     dre_nome = serializers.SerializerMethodField()
     dre_uuid = serializers.SerializerMethodField()
+    sigla = serializers.SerializerMethodField()
 
     class Meta:
         model = Unidade
@@ -157,3 +158,8 @@ class GestaoUnidadeListaSerializer(serializers.ModelSerializer):
         if obj.tipo_unidade == TipoUnidadeChoices.DRE:
             return str(obj.uuid)
         return str(obj.dre.uuid) if obj.dre else None
+    
+    def get_sigla(self, obj):
+        if obj.tipo_unidade == TipoUnidadeChoices.DRE:
+            return obj.sigla
+        return obj.dre.sigla if obj.dre else ""
