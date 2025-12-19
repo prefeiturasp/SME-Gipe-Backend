@@ -44,6 +44,21 @@ class User(AbstractUser):
         default=False,
         help_text="Indica se o usuário é administrador funcional do GIPE"
     )
+
+    data_aprovacao = models.DateTimeField(
+        "Data de Aprovação",
+        null=True,
+        blank=True,
+        help_text="Data e hora em que o usuário foi aprovado"
+    )
+
+    responsavel_aprovacao = models.CharField(
+        "Responsável pela Aprovação",
+        max_length=11,
+        null=True,
+        blank=True,
+        help_text="Codigo responsável pela aprovação"
+    )
                               
     class Meta:
         verbose_name = "Usuário"

@@ -1,4 +1,6 @@
 import pytest
+from django.utils import timezone
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
@@ -6,6 +8,21 @@ from apps.unidades.models.unidades import TipoGestaoChoices
 
 User = get_user_model()
 
+
+@pytest.fixture
+def usuario_validado(cargo_comum):
+    """Usuário já aprovado."""
+    return User.objects.create_user(
+        username="usuario_validado",
+        name="Usuario Validado",
+        email="validado@example.com",
+        cpf="12345678999",
+        cargo=cargo_comum,
+        rede=TipoGestaoChoices.INDIRETA,
+        is_validado=True,
+        data_aprovacao=timezone.now(),
+        responsavel_aprovacao="admin_gipe",
+    )
 
 @pytest.mark.django_db
 def test_list_anonymous_negado(api_client):
@@ -325,23 +342,6 @@ def test_delete_gipe_admin_remove_usuario(api_client, user_gipe_admin, usuario_d
 
 
 @pytest.mark.django_db
-def test_aprovar_gipe_admin_aprova_usuario(
-    api_client, user_gipe_admin, usuario_nao_validado
-):
-    """GIPE admin pode aprovar usuário não validado."""
-    assert usuario_nao_validado.is_validado is False
-    
-    api_client.force_authenticate(user=user_gipe_admin)
-    
-    response = api_client.post(f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/aprovar/")
-    
-    assert response.status_code == status.HTTP_200_OK
-    
-    usuario_nao_validado.refresh_from_db()
-    assert usuario_nao_validado.is_validado is True
-
-
-@pytest.mark.django_db
 def test_aprovar_pf_admin_nao_aprova_usuario_de_outra_dre(
     api_client, user_pf_admin, usuario_nao_validado, escola_outra
 ):
@@ -385,18 +385,71 @@ def test_aprovar_usuario_comum_nao_pode_aprovar(
 
 
 @pytest.mark.django_db
-def test_aprovar_ja_validado_continua_validado(
-    api_client, user_gipe_admin, usuario_dre_sp
+def test_aprovar_usuario_ja_aprovado_retorna_400(
+    api_client, user_gipe_admin, usuario_validado
 ):
-    """Aprovar usuário já validado mantém is_validado=True."""
-    usuario_dre_sp.is_validado = True
-    usuario_dre_sp.save()
-    
+    """Não permite aprovar usuário já aprovado."""
     api_client.force_authenticate(user=user_gipe_admin)
-    
-    response = api_client.post(f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/aprovar/")
-    
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_validado.uuid}/aprovar/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Usuário já está aprovado."
+
+
+@pytest.mark.django_db
+@patch("apps.users.services.usuario_core_sso_service.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_aprovar_usuario_erro_core_sso(
+    mock_cria_usuario,
+    api_client,
+    user_gipe_admin,
+    usuario_nao_validado,
+):
+    """Erro no Core SSO impede aprovação do usuário."""
+    mock_cria_usuario.side_effect = Exception("Erro Core SSO")
+
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/aprovar/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Erro ao criar o usuário no Core SSO."
+
+    usuario_nao_validado.refresh_from_db()
+    assert usuario_nao_validado.is_validado is False
+
+from unittest.mock import patch
+from django.utils import timezone
+
+@pytest.mark.django_db
+@patch("apps.users.services.envia_email_service.EnviaEmailService.enviar")
+@patch("apps.users.services.usuario_core_sso_service.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_aprovar_usuario_com_sucesso(
+    mock_cria_usuario,
+    mock_envia_email,
+    api_client,
+    user_gipe_admin,
+    usuario_nao_validado,
+):
+    """Aprova usuário com sucesso."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/aprovar/"
+    )
+
     assert response.status_code == status.HTTP_200_OK
-    
-    usuario_dre_sp.refresh_from_db()
-    assert usuario_dre_sp.is_validado is True
+    assert response.data["detail"] == "Usuário aprovado com sucesso."
+
+    usuario_nao_validado.refresh_from_db()
+
+    assert usuario_nao_validado.is_validado is True
+    assert usuario_nao_validado.data_aprovacao is not None
+    assert usuario_nao_validado.responsavel_aprovacao == str(user_gipe_admin)
+
+    mock_cria_usuario.assert_called_once()
+    mock_envia_email.assert_called_once()
