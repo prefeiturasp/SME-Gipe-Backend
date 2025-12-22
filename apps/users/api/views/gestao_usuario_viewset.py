@@ -156,3 +156,40 @@ class GestaoUsuarioViewSet(ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+    
+    @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
+    def reprovar(self, request, uuid=None):
+
+        usuario = self.get_object()
+        justificativa = request.data.get("justificativa")
+
+        if not justificativa:
+            return Response(
+                {"detail": "Justificativa é obrigatória para reprovação."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if usuario.is_validado:
+            return Response(
+                {"detail": "Usuário já aprovado não pode ser reprovado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        contexto_email = {
+            "nome_usuario": usuario.name,
+            "justificativa_admin": justificativa,
+        }
+
+        EnviaEmailService.enviar(
+            destinatario=usuario.email,
+            assunto="Acesso ao Gabinete Integrado de Proteção Escolar (GIPE)",
+            template_html="emails/cadastro_recusado.html",
+            contexto=contexto_email,
+        )
+
+        usuario.delete()
+
+        return Response(
+            {"detail": "Usuário reprovado com sucesso."},
+            status=status.HTTP_200_OK,
+        )

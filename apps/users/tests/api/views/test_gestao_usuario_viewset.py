@@ -422,8 +422,6 @@ def test_aprovar_usuario_erro_core_sso(
     usuario_nao_validado.refresh_from_db()
     assert usuario_nao_validado.is_validado is False
 
-from unittest.mock import patch
-from django.utils import timezone
 
 @pytest.mark.django_db
 @patch("apps.users.services.envia_email_service.EnviaEmailService.enviar")
@@ -453,3 +451,83 @@ def test_aprovar_usuario_com_sucesso(
 
     mock_cria_usuario.assert_called_once()
     mock_envia_email.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("apps.users.services.envia_email_service.EnviaEmailService.enviar")
+def test_reprovar_usuario_com_sucesso(
+    mock_envia_email,
+    api_client,
+    user_gipe_admin,
+    usuario_nao_validado,
+):
+    """Reprova usuário com sucesso."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/reprovar/",
+        data={"justificativa": "Cadastro incompleto"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["detail"] == "Usuário reprovado com sucesso."
+
+    assert not User.objects.filter(uuid=usuario_nao_validado.uuid).exists()
+    mock_envia_email.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_reprovar_usuario_sem_justificativa_retorna_400(
+    api_client,
+    user_gipe_admin,
+    usuario_nao_validado,
+):
+    """Justificativa é obrigatória para reprovação."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/reprovar/",
+        data={},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Justificativa é obrigatória para reprovação."
+
+
+@pytest.mark.django_db
+def test_reprovar_usuario_ja_aprovado_retorna_400(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Usuário aprovado não pode ser reprovado."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_validado.uuid}/reprovar/",
+        data={"justificativa": "Erro"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Usuário já aprovado não pode ser reprovado."
+
+
+@pytest.mark.django_db
+def test_reprovar_usuario_sem_permissao_retorna_403(
+    api_client,
+    user_comum,
+    usuario_nao_validado,
+):
+    """Usuário comum não pode reprovar."""
+    api_client.force_authenticate(user=user_comum)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/reprovar/",
+        data={"justificativa": "Teste"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
