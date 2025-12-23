@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -140,3 +141,25 @@ class TestMeView:
         response = api_client.get("/api/users/me")
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert response.data["detail"] == "Usuário não encontrado."
+
+
+@pytest.mark.django_db
+def test_get_user_inativo(api_client, cargo, django_user_model):
+    pwd = secrets.token_urlsafe(16)
+    user_inativo = django_user_model.objects.create_user(
+        username="inativo",
+        email="inativo@example.com",
+        cargo=cargo,
+        name="Usuário Inativo",
+        is_active=False
+    )
+    user_inativo.set_password(pwd)
+    user_inativo.save()
+
+    token = str(RefreshToken.for_user(user_inativo).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+    response = api_client.get("/api/users/me")
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.data["detail"] == "Não autenticado."

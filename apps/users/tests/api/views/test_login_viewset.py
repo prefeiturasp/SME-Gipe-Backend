@@ -29,6 +29,7 @@ def authenticated_client(django_user_model):
 
 class TestLoginView:
 
+    @pytest.mark.django_db
     @patch("apps.users.services.cargos_service.CargosService.get_cargo_permitido")
     @patch("apps.users.services.cargos_service.CargosService.get_cargos")
     @patch("apps.users.services.login_service.AutenticacaoService.autentica")
@@ -61,6 +62,7 @@ class TestLoginView:
         assert response.data["perfil_acesso"]["codigo"] == 30
         assert response.data["token"] == 'token-acesso'
 
+    @pytest.mark.django_db
     def test_login_sem_credenciais(self):
         factory = APIRequestFactory()
         request = factory.post("/api/login", {"username": "", LOGIN_PASS_FIELD: ""}, format='json')
@@ -70,6 +72,7 @@ class TestLoginView:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["detail"] == "Credenciais inválidas"
 
+    @pytest.mark.django_db
     @patch("apps.users.services.login_service.AutenticacaoService.autentica", side_effect=AuthenticationError("Credenciais inválidas"))
     def test_login_credenciais_invalidas(self, mock_autentica):
         factory = APIRequestFactory()
@@ -80,6 +83,7 @@ class TestLoginView:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.data["detail"] == "Usuário e/ou senha inválida"
 
+    @pytest.mark.django_db
     @patch("apps.users.services.login_service.AutenticacaoService.autentica")
     @patch("apps.users.services.cargos_service.CargosService.get_cargos")
     @patch("apps.users.services.cargos_service.CargosService.get_cargo_permitido", return_value=None)
@@ -102,6 +106,7 @@ class TestLoginView:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.data["detail"].startswith("Olá Maria!")
 
+    @pytest.mark.django_db
     @patch("apps.users.services.login_service.AutenticacaoService.autentica", side_effect=Exception("Erro inesperado"))
     def test_erro_interno(self, mock_autentica):
         factory = APIRequestFactory()
@@ -148,6 +153,7 @@ class TestLoginView:
         mock_user_filter.assert_called_once_with(username="usuario1")
         mock_user_update_or_create.assert_called_once()
 
+    @pytest.mark.django_db
     @patch("apps.users.models.Cargo.objects.update_or_create", side_effect=Exception("Erro inesperado no DB"))
     def test_create_or_update_user_with_cargo_db_error(self, mock_cargo_update_or_create):
         view = LoginView()
@@ -240,6 +246,7 @@ class TestLoginView:
 
         assert "Ocorreu um erro inesperado" in str(excinfo.value)
 
+    @pytest.mark.django_db
     def test_generate_token(self):
         view = LoginView()
 
@@ -276,6 +283,7 @@ class TestLoginView:
         assert mock_access["perfil_codigo"] == 123
         assert mock_access["perfil_nome"] == "Coordenador"
 
+    @pytest.mark.django_db
     @patch("apps.users.services.login_service.AutenticacaoService.autentica")
     @patch("apps.users.services.cargos_service.CargosService.get_cargos")
     @patch("apps.users.services.cargos_service.CargosService.get_cargo_permitido", return_value=None)
@@ -308,6 +316,7 @@ class TestLoginView:
         assert response.data["perfil_acesso"]["nome"] == "GIPE"
         assert response.data["token"] == "token-acesso"
 
+    @pytest.mark.django_db
     @patch("apps.users.services.login_service.AutenticacaoService.autentica")
     @patch("apps.users.services.cargos_service.CargosService.get_cargos")
     @patch("apps.users.services.cargos_service.CargosService.get_cargo_permitido", return_value=None)
@@ -395,3 +404,35 @@ class TestCargoAlternativo:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "instabilidade" in response.data["detail"]
+
+    @pytest.mark.django_db
+    @patch("apps.users.services.cargos_service.CargosService.get_cargo_permitido")
+    @patch("apps.users.services.cargos_service.CargosService.get_cargos")
+    @patch("apps.users.services.login_service.AutenticacaoService.autentica")
+    @patch("apps.users.api.views.login_viewset.LoginView.create_or_update_user_with_cargo")
+    @patch("apps.users.api.views.login_viewset.LoginView._generate_token")
+    def test_login_usuario_inativo(self, mock_generate_token, mock_create_update, mock_autentica, mock_get_cargos, mock_get_cargo_permitido):
+        mock_autentica.return_value = {
+            "nome": "João Silva",
+            "email": "joao@email.com",
+            "cpf": "12345678901",
+            "login": "joaos"
+        }
+
+        mock_get_cargos.return_value = {"cargos": [{"codigo": 30, "nome": "Diretor de Escola"}]}
+        mock_get_cargo_permitido.return_value = {"codigo": 30, "nome": "Diretor de Escola"}
+
+        user_mock = MagicMock()
+        user_mock.cargo.codigo = 30
+        user_mock.cargo.nome = "Diretor de Escola"
+        user_mock.is_active = False
+        mock_create_update.return_value = user_mock
+        mock_generate_token.return_value = {'access': 'token-acesso', 'refresh': 'token-refresh'}
+
+        factory = APIRequestFactory()
+        request = factory.post("/api/login", {"username": "1234567", LOGIN_PASS_FIELD: DUMMY_PASS}, format='json')
+
+        response = LoginView.as_view()(request)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.data["detail"] == "Usuário e/ou senha inválida"
