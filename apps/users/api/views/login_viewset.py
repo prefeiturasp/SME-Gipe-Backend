@@ -83,14 +83,14 @@ class LoginView(TokenObtainPairView):
     def _valida_cargo_permitido(self, rf: str, auth_data: dict) -> dict:
         """ Valida se o usuário possui um cargo autorizado para acesso ao sistema. """
 
+        if cargo_alternativo := self._get_cargo_gipe_ou_ponto_focal(rf):
+            logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
+            return cargo_alternativo
+        
         # Busca cargo permitido
         cargo_permitido = CargosService.get_cargo_permitido(auth_data)
-
         if not cargo_permitido:
-            if cargo_alternativo := self._get_cargo_gipe_ou_ponto_focal(rf):
-                logger.info("Usuário com RF %s tem cargo GIPE ou PONTO FOCAL DRE", rf)
-                return cargo_alternativo
-            
+
             perfis = auth_data.get('perfis')
             if perfis and (perfil_autorizado := self._get_cargo_guide_indireta_parceira(perfis)):
                 logger.info("Usuário %s tem o perfil de Diretor de escola", rf)
@@ -214,6 +214,10 @@ class LoginView(TokenObtainPairView):
         """Monta resposta com dados do usuário"""
             
         _user = self.create_or_update_user_with_cargo(login, senha, auth_data, cargo_autorizado)
+
+        if not _user.is_active:
+            logger.warning("Tentativa de login com usuário inativo: %s", login)
+            raise AuthenticationError({'detail': 'Usuário e/ou senha inválida'})
 
         # Gera tokens JWT
         tokens = self._generate_token(_user)
