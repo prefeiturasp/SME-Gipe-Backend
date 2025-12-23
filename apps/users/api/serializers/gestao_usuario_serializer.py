@@ -284,12 +284,25 @@ class GestaoUsuarioRetrieveSerializer(GestaoUsuarioSerializer):
 
     def get_codigo_eol_unidade(self, obj):
         primeira_unidade = obj.unidades.first()
-        if primeira_unidade:
-            return primeira_unidade.codigo_eol
-        return None
+
+        if not primeira_unidade:
+            return None
+
+        if primeira_unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+            return None
+
+        return primeira_unidade.codigo_eol
 
     def get_codigo_eol_dre_da_unidade(self, obj):
         primeira_unidade = obj.unidades.first()
-        if primeira_unidade and primeira_unidade.dre_id:
-            return primeira_unidade.dre_id
+
+        if not primeira_unidade:
+            return None
+
+        if primeira_unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+            return primeira_unidade.codigo_eol
+
+        if primeira_unidade.dre:
+            return primeira_unidade.dre.codigo_eol
+
         return None
