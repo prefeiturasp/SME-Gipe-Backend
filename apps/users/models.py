@@ -59,6 +59,21 @@ class User(AbstractUser):
         blank=True,
         help_text="Codigo responsável pela aprovação"
     )
+
+    data_inativacao = models.DateTimeField(
+        "Data de Inativação",
+        null=True,
+        blank=True,
+        help_text="Data e hora em que o usuário foi inativado"
+    )
+
+    responsavel_inativacao = models.CharField(
+        "Responsável pela Inativação",
+        max_length=11,
+        null=True,
+        blank=True,
+        help_text="Codigo responsável pela inativação"
+    )
                               
     class Meta:
         verbose_name = "Usuário"
