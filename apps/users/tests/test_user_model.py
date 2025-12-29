@@ -2,6 +2,7 @@
 Testes para o modelo User.
 """
 import pytest
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from apps.users.models import Cargo
@@ -63,3 +64,66 @@ class TestUserModel:
 
         # Act & Assert
         assert user.is_diretor is False
+
+
+@pytest.mark.django_db
+class TestUserModelCamposAprovacaoInativacao:
+    """Testes para campos de aprovação e inativação do modelo User."""
+
+    def test_campos_aprovacao_podem_ser_preenchidos(self):
+        """Testa persistência dos campos de aprovação."""
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+        data_aprovacao = timezone.now()
+
+        user = User.objects.create(
+            username="user_aprovado",
+            cpf="12312312312",
+            name="Usuário Aprovado",
+            cargo=cargo,
+            data_aprovacao=data_aprovacao,
+            responsavel_aprovacao="ADMIN001",
+        )
+
+        user.refresh_from_db()
+
+        assert user.data_aprovacao == data_aprovacao
+        assert user.responsavel_aprovacao == "ADMIN001"
+
+    def test_campos_inativacao_podem_ser_preenchidos(self):
+        """Testa persistência dos campos de inativação."""
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+        data_inativacao = timezone.now()
+
+        user = User.objects.create(
+            username="user_inativo",
+            cpf="32132132132",
+            name="Usuário Inativo",
+            cargo=cargo,
+            data_inativacao=data_inativacao,
+            responsavel_inativacao="ADMIN002",
+            is_active=False,
+        )
+
+        user.refresh_from_db()
+
+        assert user.data_inativacao == data_inativacao
+        assert user.responsavel_inativacao == "ADMIN002"
+        assert user.is_active is False
+
+    def test_campos_aprovacao_e_inativacao_podem_ser_nulos(self):
+        """Testa que os campos permitem valores nulos."""
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        user = User.objects.create(
+            username="user_sem_datas",
+            cpf="99988877766",
+            name="Usuário Sem Datas",
+            cargo=cargo,
+        )
+
+        user.refresh_from_db()
+
+        assert user.data_aprovacao is None
+        assert user.responsavel_aprovacao is None
+        assert user.data_inativacao is None
+        assert user.responsavel_inativacao is None

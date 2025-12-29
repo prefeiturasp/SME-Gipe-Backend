@@ -27,6 +27,7 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
 
     perfil = serializers.CharField(source="cargo.nome", read_only=True)
     nome = serializers.CharField(source="name", read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
     data_solicitacao = serializers.DateTimeField(
         source="date_joined",
         format="%d/%m/%Y",
@@ -50,7 +51,8 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
             "rede",               
             "diretoria_regional",
             "unidade_educacional",
-            "is_validado",        
+            "is_validado",
+            "is_active",
         ]
 
 

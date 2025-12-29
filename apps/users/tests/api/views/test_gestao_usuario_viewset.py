@@ -534,9 +534,79 @@ def test_reprovar_usuario_sem_permissao_retorna_403(
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-# =======================================================
-# Tests para get_object() - Tratamento de UUID inválido/não encontrado
-# =======================================================
+@pytest.mark.django_db
+def test_inativar_usuario_sem_permissao_retorna_403(
+    api_client,
+    user_comum,
+    usuario_validado,
+):
+    """Usuário sem permissão não pode inativar outro usuário."""
+    api_client.force_authenticate(user=user_comum)
+
+    response = api_client.put(
+        f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/"
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+@pytest.mark.django_db
+def test_inativar_usuario_com_sucesso(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Usuário com permissão consegue inativar um usuário."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.services.gestao_usuario_service.InativarUsuarioService.inativar"
+    ) as mock_inativar:
+
+        response = api_client.put(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == "Usuário inativado com sucesso."
+
+        mock_inativar.assert_called_once_with(
+            usuario_a_ser_inativado=usuario_validado,
+            usuario_responsavel=str(user_gipe_admin),
+        )
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_inexistente_retorna_404(
+    api_client,
+    user_gipe_admin,
+):
+    """Retorna 404 ao tentar inativar um usuário que não existe."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    fake_uuid = "11111111-1111-1111-1111-111111111111"
+
+    response = api_client.put(
+        f"/api/users/gestao-usuarios/{fake_uuid}/inativar/"
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["detail"] == "Usuário não encontrado."
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_uuid_invalido_retorna_404(
+    api_client,
+    user_gipe_admin,
+):
+    """Retorna 404 quando o UUID informado é inválido."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.put(
+        "/api/users/gestao-usuarios/uuid-invalido/inativar/"
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["detail"] == "UUID informado é inválido."
 
 @pytest.mark.django_db
 def test_retrieve_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):

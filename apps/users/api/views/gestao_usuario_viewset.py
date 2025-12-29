@@ -16,6 +16,9 @@ from apps.unidades.models.unidades import TipoUnidadeChoices, TipoGestaoChoices
 from apps.users.services.envia_email_service import EnviaEmailService
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
+from uuid import UUID
+from apps.users.services.gestao_usuario_service import InativarUsuarioService
+
 User = get_user_model()
 env = environ.Env()
 
@@ -220,4 +223,32 @@ class GestaoUsuarioViewSet(ModelViewSet):
         return Response(
             {"detail": "Usuário reprovado com sucesso."},
             status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["put"], permission_classes=[CanApproveUser])
+    def inativar(self, request, uuid=None):
+
+        try:
+            _uuid = UUID(uuid)
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "UUID informado é inválido."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        usuario = User.objects.filter(uuid=_uuid).first()
+        if not usuario:
+            return Response(
+                {"detail": "Usuário não encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        InativarUsuarioService.inativar(
+            usuario_a_ser_inativado=usuario,
+            usuario_responsavel=str(request.user)
+        )
+
+        return Response(
+            {"detail": "Usuário inativado com sucesso."},
+            status=status.HTTP_200_OK
         )
