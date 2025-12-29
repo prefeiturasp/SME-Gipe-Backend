@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from django.utils import timezone
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
@@ -187,7 +188,7 @@ def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
     assert response.data["username"] == "comum_simples"
     
     response_outro = api_client.get(f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/")
-    assert response_outro.status_code == status.HTTP_404_NOT_FOUND
+    assert response_outro.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -284,7 +285,7 @@ def test_retrieve_pf_admin_nao_ve_usuario_de_outra_dre(
     
     response = api_client.get(f"/api/users/gestao-usuarios/{usuario_dre_outra.uuid}/")
     
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 
@@ -308,7 +309,7 @@ def test_update_pf_admin_nao_atualiza_usuario_de_outra_dre(
         format="json"
     )
     
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -354,7 +355,7 @@ def test_aprovar_pf_admin_nao_aprova_usuario_de_outra_dre(
     
     response = api_client.post(f"/api/users/gestao-usuarios/{usuario_nao_validado.uuid}/aprovar/")
     
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -532,6 +533,7 @@ def test_reprovar_usuario_sem_permissao_retorna_403(
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
 @pytest.mark.django_db
 def test_inativar_usuario_sem_permissao_retorna_403(
     api_client,
@@ -605,3 +607,97 @@ def test_inativar_usuario_uuid_invalido_retorna_404(
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.data["detail"] == "UUID informado é inválido."
+
+@pytest.mark.django_db
+def test_retrieve_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
+    """Buscar usuário com UUID válido mas não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    # UUID válido mas que não existe no banco
+    uuid_inexistente = uuid.uuid4()
+    
+    response = api_client.get(f"/api/users/gestao-usuarios/{uuid_inexistente}/")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert "Usuário não encontrado" in str(response.data)
+
+
+@pytest.mark.django_db
+def test_update_uuid_nao_existe_retorna_404(api_client, user_gipe_admin, cargo_comum):
+    """Atualizar usuário com UUID não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    uuid_inexistente = uuid.uuid4()
+    
+    data = {
+        "username": "teste",
+        "email": "teste@example.com",
+        "cpf": "12345678901",
+        "cargo": cargo_comum.pk,
+    }
+    
+    response = api_client.put(
+        f"/api/users/gestao-usuarios/{uuid_inexistente}/",
+        data,
+        format="json"
+    )
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_partial_update_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
+    """Patch em usuário com UUID não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    uuid_inexistente = uuid.uuid4()
+    
+    data = {"email": "novo@example.com"}
+    
+    response = api_client.patch(
+        f"/api/users/gestao-usuarios/{uuid_inexistente}/",
+        data,
+        format="json"
+    )
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_delete_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
+    """Deletar usuário com UUID não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    uuid_inexistente = uuid.uuid4()
+    
+    response = api_client.delete(f"/api/users/gestao-usuarios/{uuid_inexistente}/")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_aprovar_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
+    """Aprovar usuário com UUID não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    uuid_inexistente = uuid.uuid4()
+    
+    response = api_client.post(f"/api/users/gestao-usuarios/{uuid_inexistente}/aprovar/")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_reprovar_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
+    """Reprovar usuário com UUID não existente retorna 404."""
+    api_client.force_authenticate(user=user_gipe_admin)
+    
+    uuid_inexistente = uuid.uuid4()
+    
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{uuid_inexistente}/reprovar/",
+        data={"justificativa": "Teste"},
+        format="json"
+    )
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
