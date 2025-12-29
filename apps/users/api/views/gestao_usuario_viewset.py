@@ -1,11 +1,13 @@
 import environ
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.http import Http404
 
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.exceptions import PermissionDenied
 
 from apps.users.api.serializers.gestao_usuario_serializer import GestaoUsuarioListaSerializer, GestaoUsuarioSerializer, GestaoUsuarioRetrieveSerializer
 from apps.users.permissions import CanManageUsers, CanApproveUser
@@ -20,7 +22,7 @@ env = environ.Env()
 
 class GestaoUsuarioViewSet(ModelViewSet):
     """
-    Gestão de usuários via painel (NextJS).
+    Gestão de usuários via painel Frontend.
     """
     queryset = (
         User.objects
@@ -30,6 +32,32 @@ class GestaoUsuarioViewSet(ModelViewSet):
     serializer_class = GestaoUsuarioSerializer
     permission_classes = [CanManageUsers]
     lookup_field = "uuid"
+    
+    def get_object(self):
+        """
+        Sobrescreve get_object para retornar erro 403 ao invés de 404
+        quando o usuário não tem permissão para acessar o objeto.
+        """
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        
+        # Verifica se o objeto existe no banco de dados
+        try:
+            obj = User.objects.get(**filter_kwargs)
+        except User.DoesNotExist:
+            raise Http404("Usuário não encontrado.")
+        
+        # Verifica se o objeto está no queryset permitido para o usuário
+        queryset = self.filter_queryset(self.get_queryset())
+        if not queryset.filter(**filter_kwargs).exists():
+            raise PermissionDenied(
+                "Você não tem permissão para acessar ou editar este usuário."
+            )
+        
+        # Verifica as permissões do objeto
+        self.check_object_permissions(self.request, obj)
+        
+        return obj
     
     def get_serializer_class(self):
         
