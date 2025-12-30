@@ -17,7 +17,7 @@ from apps.users.services.envia_email_service import EnviaEmailService
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
 from uuid import UUID
-from apps.users.services.gestao_usuario_service import InativarUsuarioService
+from apps.users.services.gestao_usuario_service import InativarUsuarioService, ReativarUsuarioService
 
 User = get_user_model()
 env = environ.Env()
@@ -225,7 +225,7 @@ class GestaoUsuarioViewSet(ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["put"], permission_classes=[CanApproveUser])
+    @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
     def inativar(self, request, uuid=None):
 
         try:
@@ -250,5 +250,32 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
         return Response(
             {"detail": "Usuário inativado com sucesso."},
+            status=status.HTTP_200_OK
+        )
+    
+    @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
+    def reativar(self, request, uuid=None):
+
+        try:
+            _uuid = UUID(uuid)
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "UUID informado é inválido."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        usuario = User.objects.filter(uuid=_uuid).first()
+        if not usuario:
+            return Response(
+                {"detail": "Usuário não foi encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        ReativarUsuarioService.reativar(
+            usuario_a_ser_reativado=usuario
+        )
+
+        return Response(
+            {"detail": "Usuário reativado com sucesso."},
             status=status.HTTP_200_OK
         )

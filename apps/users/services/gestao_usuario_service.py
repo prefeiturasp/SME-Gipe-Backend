@@ -23,3 +23,27 @@ class InativarUsuarioService:
             )
 
         return usuario_a_ser_inativado
+
+
+class ReativarUsuarioService:
+
+    @staticmethod
+    def reativar(usuario_a_ser_reativado):
+
+        if usuario_a_ser_reativado.is_active:
+            return usuario_a_ser_reativado
+
+        with transaction.atomic():
+            usuario_a_ser_reativado.is_active = True
+            usuario_a_ser_reativado.data_inativacao = None
+            usuario_a_ser_reativado.responsavel_inativacao = None
+
+            usuario_a_ser_reativado.save(
+                update_fields=[
+                    "is_active",
+                    "data_inativacao",
+                    "responsavel_inativacao",
+                ]
+            )
+
+        return usuario_a_ser_reativado
