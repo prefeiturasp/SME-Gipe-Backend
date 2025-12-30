@@ -2,7 +2,7 @@ import pytest
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
-from apps.users.services.gestao_usuario_service import InativarUsuarioService
+from apps.users.services.gestao_usuario_service import InativarUsuarioService, ReativarUsuarioService
 from apps.users.models import Cargo
 
 User = get_user_model()
@@ -86,3 +86,51 @@ class TestInativarUsuarioService:
         assert usuario.is_active is False
         assert usuario.data_inativacao is not None
         assert usuario.responsavel_inativacao == "01234567899"
+
+
+@pytest.mark.django_db
+class TestReativarUsuarioService:
+    """Testes para o service ReativarUsuarioService."""
+
+    def test_reativar_usuario_inativo_com_sucesso(self):
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+        data_inativacao = timezone.now()
+
+        usuario = User.objects.create(
+            username="usuario_inativo",
+            cpf="12345678900",
+            name="Usuário Inativo",
+            cargo=cargo,
+            is_active=False,
+            data_inativacao=data_inativacao,
+            responsavel_inativacao="ADMIN001",
+        )
+
+        resultado = ReativarUsuarioService.reativar(usuario)
+
+        usuario.refresh_from_db()
+
+        assert resultado == usuario
+        assert usuario.is_active is True
+        assert usuario.data_inativacao is None
+        assert usuario.responsavel_inativacao is None
+
+    def test_reativar_usuario_ja_ativo_nao_altera_dados(self):
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        usuario = User.objects.create(
+            username="usuario_ativo",
+            cpf="99988877766",
+            name="Usuário Ativo",
+            cargo=cargo,
+            is_active=True,
+        )
+
+        resultado = ReativarUsuarioService.reativar(usuario)
+
+        usuario.refresh_from_db()
+
+        assert resultado == usuario
+        assert usuario.is_active is True
+        assert usuario.data_inativacao is None
+        assert usuario.responsavel_inativacao is None
