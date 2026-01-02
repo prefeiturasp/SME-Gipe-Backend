@@ -227,21 +227,18 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
     @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
     def inativar(self, request, uuid=None):
+        
 
         try:
-            _uuid = UUID(uuid)
+            UUID(uuid)
         except (ValueError, TypeError):
             return Response(
                 {"detail": "UUID informado é inválido."},
                 status=status.HTTP_404_NOT_FOUND
             )
+            
+        usuario = self.get_object()
 
-        usuario = User.objects.filter(uuid=_uuid).first()
-        if not usuario:
-            return Response(
-                {"detail": "Usuário não encontrado."},
-                status=status.HTTP_404_NOT_FOUND
-            )
 
         InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
@@ -255,21 +252,16 @@ class GestaoUsuarioViewSet(ModelViewSet):
     
     @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
     def reativar(self, request, uuid=None):
-
+        
         try:
-            _uuid = UUID(uuid)
+            UUID(uuid)
         except (ValueError, TypeError):
             return Response(
                 {"detail": "UUID informado é inválido."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        usuario = User.objects.filter(uuid=_uuid).first()
-        if not usuario:
-            return Response(
-                {"detail": "Usuário não foi encontrado."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            
+        usuario = self.get_object()
 
         ReativarUsuarioService.reativar(
             usuario_a_ser_reativado=usuario
