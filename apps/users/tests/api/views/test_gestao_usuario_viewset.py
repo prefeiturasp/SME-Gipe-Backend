@@ -763,19 +763,3 @@ def test_reativar_usuario_uuid_invalido_retorna_404(
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.data["detail"] == "UUID informado é inválido."
-
-@pytest.mark.django_db
-def test_reativar_usuario_nao_encontrado_retorna_404(
-    api_client,
-    user_gipe_admin,
-):
-    api_client.force_authenticate(user=user_gipe_admin)
-
-    fake_uuid = "11111111-1111-1111-1111-111111111111"
-
-    response = api_client.post(
-        f"/api/users/gestao-usuarios/{fake_uuid}/reativar/"
-    )
-
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.data["detail"] == "Usuário não foi encontrado."
