@@ -17,10 +17,6 @@ class DummyView:
         self.action = action
 
 
-# =========================
-# Tests para CanManageUsers
-# =========================
-
 @pytest.mark.django_db
 def test_can_manage_users_anonymous(api_rf):
     perm = CanManageUsers()
@@ -76,10 +72,6 @@ def test_can_manage_users_nao_admin_so_retrieve_update(api_rf, user_comum):
         assert perm.has_permission(request, view) is True
 
 
-# ===================================
-# Tests para has_object_permission de CanManageUsers
-# ===================================
-
 @pytest.mark.django_db
 def test_can_manage_users_object_gipe_admin_acessa_qualquer_usuario(api_rf, user_gipe_admin, user_comum):
     """GIPE admin pode acessar qualquer usuário."""
@@ -101,8 +93,6 @@ def test_can_manage_users_object_pf_admin_acessa_usuario_mesma_dre(
     request.user = user_pf_admin
     view = DummyView(action="retrieve")
 
-    # user_comum tem escola_sp que pertence a dre_sp
-    # user_pf_admin tem dre_sp nas unidades
     assert perm.has_object_permission(request, view, user_comum) is True
 
 
@@ -116,8 +106,6 @@ def test_can_manage_users_object_pf_admin_nao_acessa_usuario_outra_dre(
     request.user = user_pf_admin
     view = DummyView(action="retrieve")
 
-    # outro_user_comum está em escola_outra, que pertence a dre_outra
-    # user_pf_admin só tem acesso a dre_sp
     assert perm.has_object_permission(request, view, outro_user_comum) is False
 
 
@@ -144,10 +132,6 @@ def test_can_manage_users_object_usuario_comum_nao_acessa_outro_usuario(
 
     assert perm.has_object_permission(request, view, outro_user_comum) is False
 
-
-# ===========================
-# Tests para CanApproveUser
-# ===========================
 
 @pytest.mark.django_db
 def test_can_approve_user_anonymous_negado(api_rf):
@@ -206,10 +190,6 @@ def test_can_approve_user_comum_negado(api_rf, user_comum):
     assert perm.has_permission(request, view) is False
 
 
-# =====================================================
-# Tests para has_object_permission de CanApproveUser
-# =====================================================
-
 @pytest.mark.django_db
 def test_can_approve_user_object_gipe_admin_aprova_qualquer_um(
     api_rf, user_gipe_admin, user_comum
@@ -233,8 +213,6 @@ def test_can_approve_user_object_pf_admin_aprova_usuario_mesma_dre(
     request.user = user_pf_admin
     view = DummyView(action="approve")
 
-    # user_comum tem escola_sp que pertence a dre_sp
-    # user_pf_admin tem dre_sp nas unidades
     assert perm.has_object_permission(request, view, user_comum) is True
 
 
@@ -248,7 +226,6 @@ def test_can_approve_user_object_pf_admin_nao_aprova_usuario_outra_dre(
     request.user = user_pf_admin
     view = DummyView(action="approve")
 
-    # outro_user_comum está em escola_outra, que pertence a dre_outra
     assert perm.has_object_permission(request, view, outro_user_comum) is False
 
 
@@ -263,3 +240,5 @@ def test_can_approve_user_object_usuario_comum_nao_pode_aprovar(
     view = DummyView(action="approve")
 
     assert perm.has_object_permission(request, view, outro_user_comum) is False
+
+

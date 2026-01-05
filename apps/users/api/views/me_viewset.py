@@ -1,19 +1,28 @@
-from django.db.models import Prefetch
-from django.contrib.auth import get_user_model
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from django.db.models import Prefetch
+from django.contrib.auth import get_user_model
 
 from apps.users.api.serializers.me_serializer import UserMeSerializer
 
 User = get_user_model()
+
 
 class MeView(APIView):
     """
     Retorna os dados do usuário autenticado (requer Bearer access token).
     """
     permission_classes = (permissions.IsAuthenticated,)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, AuthenticationFailed):
+            return Response(
+                {"detail": "Não autenticado."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        return super().handle_exception(exc)
 
     def get(self, request, *args, **kwargs):
 
@@ -32,9 +41,11 @@ class MeView(APIView):
 
         try:
             user = qs.get(pk=request.user.pk)
-
         except User.DoesNotExist:
-            return Response({"detail": "Usuário não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Usuário não encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         serializer = UserMeSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
