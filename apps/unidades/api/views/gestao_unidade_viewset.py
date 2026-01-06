@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -35,12 +36,19 @@ class GestaoUnidadeViewSet(ModelViewSet):
                 tipo_unidade=TipoUnidadeChoices.DRE
             ).values_list("uuid", flat=True)
 
-            base_qs = qs.filter(dre__uuid__in=dres_pf).distinct()
+            # Retorna as DREs do ponto focal OU unidades subordinadas a essas DREs
+            base_qs = qs.filter(
+                Q(uuid__in=dres_pf) | Q(dre__uuid__in=dres_pf)
+            ).distinct()
 
         else:
             base_qs = qs.none()
             
          # Filtros
+        tipo = params.get("tipo_unidade")
+        if tipo:
+            base_qs = base_qs.filter(tipo_unidade=tipo)
+            
         dre_uuid = params.get("dre")
         if dre_uuid:
             base_qs = base_qs.filter(dre__uuid=dre_uuid)
@@ -48,10 +56,6 @@ class GestaoUnidadeViewSet(ModelViewSet):
         rede = params.get("rede")
         if rede:
             base_qs = base_qs.filter(rede=rede)
-
-        tipo = params.get("tipo_unidade")
-        if tipo:
-            base_qs = base_qs.filter(tipo_unidade=tipo)
 
         ativa = params.get("ativa")
         if ativa is not None:

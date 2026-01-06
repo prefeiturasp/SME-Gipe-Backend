@@ -37,11 +37,12 @@ class TestGestaoUnidadeViewSetPermissoes:
         response = api_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
-        # Deve ver apenas escola_sp (que pertence à dre_sp)
-        assert len(response.data) == 1
-        assert str(response.data[0]["uuid"]) == str(escola_sp.uuid)
-        # Não deve ver dre_outra nem escola_outra
+        # Deve ver apenas escola_sp (que pertence à dre_sp) e a dre_sp
+        assert len(response.data) == 2
         uuids = [str(u["uuid"]) for u in response.data]
+        assert str(dre_sp.uuid) in uuids
+        assert str(escola_sp.uuid) in uuids
+        # Não deve ver dre_outra nem escola_outra
         assert str(dre_outra.uuid) not in uuids
         assert str(escola_outra.uuid) not in uuids
 
