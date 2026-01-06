@@ -86,6 +86,33 @@ def ue_direta(dre):
     )
 
 
+@pytest.fixture
+def ue_indireta_inativa(dre):
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="444444",
+        nome="UE Indireta Inativa",
+        sigla="UE",
+        tipo_unidade=TipoUnidadeChoices.CEI,
+        rede=TipoGestaoChoices.INDIRETA,
+        dre=dre,
+        ativa=False,
+    )
+
+
+@pytest.fixture
+def dre_inativa():
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="555555",
+        nome="DRE Inativa",
+        sigla="DRE",
+        tipo_unidade=TipoUnidadeChoices.DRE,
+        rede=TipoGestaoChoices.INDIRETA,
+        ativa=False,
+    )
+
+
 @pytest.mark.django_db
 class TestUnidadeViewSet:
 
@@ -177,3 +204,45 @@ class TestUnidadeViewSet:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["detail"] == "Campo 'codigos' deve ser uma lista."
+    
+    def test_listar_ues_apenas_ativas(
+        self, api_client, dre, ue_indireta, ue_indireta_inativa
+    ):
+        response = api_client.get(
+            f"/api/unidades/?tipo=UE&dre={dre.uuid}&ativas=true"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+
+        assert "UE Indireta" in nomes
+        assert "UE Indireta Inativa" not in nomes
+    
+    def test_listar_dres_apenas_ativas(
+        self, api_client, dre, dre_inativa
+    ):
+        response = api_client.get("/api/unidades/?tipo=DRE&ativas=true")
+
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+
+        assert "DRE Teste" in nomes
+        assert "DRE Inativa" not in nomes
+    
+    def test_listar_todas_apenas_ativas(
+        self,
+        api_client,
+        dre,
+        dre_inativa,
+        ue_indireta,
+        ue_indireta_inativa,
+    ):
+        response = api_client.get("/api/unidades/?ativas=true")
+
+        assert response.status_code == status.HTTP_200_OK
+        nomes = [u["nome"] for u in response.data]
+
+        assert "DRE Teste" in nomes
+        assert "UE Indireta" in nomes
+        assert "DRE Inativa" not in nomes
+        assert "UE Indireta Inativa" not in nomes
