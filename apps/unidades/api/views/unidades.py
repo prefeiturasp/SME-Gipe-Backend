@@ -18,7 +18,16 @@ logger = logging.getLogger(__name__)
 class UnidadeViewSet(ModelViewSet):
     permission_classes = [AllowAny]
     serializer_class = UnidadeSerializer
-    queryset = Unidade.objects.all()
+
+    def get_queryset(self):
+        queryset = Unidade.objects.all()
+
+        ativas = self.request.query_params.get("ativas", "")
+
+        if ativas.lower() == "true":
+            queryset = queryset.filter(ativa=True)
+
+        return queryset
  
     def list(self, request, *args, **kwargs):
         tipo = request.query_params.get("tipo")
@@ -46,9 +55,8 @@ class UnidadeViewSet(ModelViewSet):
             status.HTTP_400_BAD_REQUEST
         )
  
- 
     def _listar_dres(self):
-        unidades = self.queryset.filter(tipo_unidade=TipoUnidadeChoices.DRE).order_by("tipo_unidade", "nome")
+        unidades = self.get_queryset().filter(tipo_unidade=TipoUnidadeChoices.DRE).order_by("tipo_unidade", "nome")
         logger.info("Filtrando unidades do tipo DRE. Quantidade encontrada: %d", unidades.count())
         return self._responder_com_serializador(unidades)
  
@@ -84,7 +92,7 @@ class UnidadeViewSet(ModelViewSet):
         )
  
         # Filtro base: unidades vinculadas à DRE
-        unidades = self.queryset.filter(dre=dre)
+        unidades = self.get_queryset().filter(dre=dre)
         
         # Aplicar filtro de rede conforme parâmetro
         if rede is None:
