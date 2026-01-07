@@ -76,8 +76,7 @@ class GestaoUsuarioViewSet(ModelViewSet):
         user = self.request.user
         params = self.request.query_params
 
-        qs = self.queryset
-
+        qs = self.queryset.exclude(is_superuser=True)
 
         if user.is_gipe:
             base_qs = qs
