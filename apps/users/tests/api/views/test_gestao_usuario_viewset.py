@@ -763,3 +763,21 @@ def test_reativar_usuario_uuid_invalido_retorna_404(
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.data["detail"] == "UUID informado é inválido."
+
+@pytest.mark.django_db
+def test_list_admin_nao_ve_superusuarios(
+    api_client,
+    user_gipe_admin
+):
+    """
+    Não deve ver superusuários na listagem.
+    """
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.get("/api/users/gestao-usuarios/")
+
+    assert response.status_code == status.HTTP_200_OK
+
+    usernames = [u["username"] for u in response.data]
+
+    assert "superuser" not in usernames
