@@ -24,3 +24,4 @@ class UnidadeAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ['dre']
     ordering = ['tipo_unidade', 'nome']
+    readonly_fields = ("uuid",)

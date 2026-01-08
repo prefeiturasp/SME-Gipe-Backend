@@ -1,15 +1,15 @@
 from django.db.models import Q
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.decorators import action
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.viewsets import ModelViewSet
 
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
 from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
     GestaoUnidadeListaSerializer,
 )
-
+from apps.unidades.services.gestao_unidade_service import InativarUnidadeService
 
 class GestaoUnidadeViewSet(ModelViewSet):
 
@@ -76,11 +76,23 @@ class GestaoUnidadeViewSet(ModelViewSet):
     @action(detail=True, methods=["post"], url_path="inativar")
     def inativar(self, request, uuid=None):
         unidade = self.get_object()
-        unidade.ativa = False
-        unidade.save(update_fields=["ativa"])
-        return Response(
-            {"detail": "Unidade inativada com sucesso."}, status=status.HTTP_200_OK
-        )
+
+        try:
+            InativarUnidadeService(
+                unidade=unidade,
+                usuario_responsavel=str(request.user)
+            ).executar()
+
+            return Response(
+                {"detail": "Unidade e usuários inativados com sucesso."},
+                status=status.HTTP_200_OK
+            )
+        
+        except Exception as err:
+            return Response(
+                {"detail": err.message},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
     @action(detail=False, methods=['get'], url_path='tipos-unidade')
     def tipos_unidade(self, _):
