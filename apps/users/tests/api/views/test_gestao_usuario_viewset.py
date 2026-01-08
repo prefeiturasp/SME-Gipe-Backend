@@ -83,7 +83,7 @@ def test_create_usuario_comum_negado(api_client, user_comum, cargo_comum):
 
 @pytest.mark.django_db
 def test_list_gipe_admin_ve_todos_usuarios(
-    api_client, user_gipe_admin, usuario_dre_sp, usuario_dre_outra
+    api_client, user_gipe_admin, usuario_dre_sp, usuario_dre_outra, user_pf_admin
 ):
     """GIPE admin vê todos os usuários do sistema."""
     api_client.force_authenticate(user=user_gipe_admin)
@@ -95,6 +95,7 @@ def test_list_gipe_admin_ve_todos_usuarios(
     assert "gipe_admin" in usernames
     assert "usuario_dre_sp" in usernames
     assert "usuario_dre_outra" in usernames
+    assert "pf_admin" in usernames
 
 
 @pytest.mark.django_db
@@ -274,6 +275,30 @@ def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "detail" in response.data
+
+
+@pytest.mark.django_db
+def test_create_pf_admin_nao_pode_atribuir_outra_dre(
+    api_client, user_pf_admin, cargo_comum, dre_outra
+):
+    """PF admin não pode atribuir usuário diretamente a outra DRE."""
+    api_client.force_authenticate(user=user_pf_admin)
+    
+    data = {
+        "username": "novo_pf_outra_dre",
+        "name": "Novo PF Outra DRE",
+        "email": "novo.pf.outra@example.com",
+        "cpf": "77777777777",
+        "cargo": cargo_comum.pk,
+        "unidades": [dre_outra.codigo_eol],
+        "is_app_admin": False,
+    }
+    
+    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
+    
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "detail" in response.data
+    assert "Ponto Focal só pode cadastrar usuários para sua própria DRE" in response.data["detail"]
 
 
 @pytest.mark.django_db

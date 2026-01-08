@@ -2,6 +2,48 @@ from rest_framework.permissions import BasePermission
 from apps.unidades.models.unidades import TipoUnidadeChoices
 
 
+def _get_user_dres_ids(user):
+    """
+    Retorna os IDs (codigo_eol) das DREs do usuário.
+    """
+    return set(
+        user.unidades
+            .filter(tipo_unidade=TipoUnidadeChoices.DRE)
+            .values_list("codigo_eol", flat=True)
+    )
+
+
+def _get_obj_related_dres_ids(obj):
+    """
+    Retorna os IDs das DREs relacionadas ao objeto.
+    Inclui tanto DREs diretas quanto DREs de unidades vinculadas.
+    """
+    # 1. DREs diretas (se obj for Ponto Focal de DRE)
+    obj_dres = set(
+        obj.unidades
+            .filter(tipo_unidade=TipoUnidadeChoices.DRE)
+            .values_list("codigo_eol", flat=True)
+    )
+    # 2. DREs das unidades não-DRE (se obj for de escola, etc.)
+    obj_dres_unidades = set(
+        obj.unidades
+            .exclude(tipo_unidade=TipoUnidadeChoices.DRE)
+            .exclude(dre__isnull=True)
+            .values_list("dre_id", flat=True)
+    )
+    
+    return obj_dres | obj_dres_unidades
+
+
+def _ponto_focal_has_access_to_user(ponto_focal, target_user):
+    """
+    Verifica se um Ponto Focal tem acesso a um usuário alvo.
+    """
+    user_dres = _get_user_dres_ids(ponto_focal)
+    obj_dres = _get_obj_related_dres_ids(target_user)
+    return bool(user_dres & obj_dres)
+
+
 class CanManageUsers(BasePermission):
     """
     Permissão para listar / criar / editar / visualizar usuários.
@@ -47,17 +89,7 @@ class CanManageUsers(BasePermission):
 
         # Ponto Focal admin → somente usuários com unidades na(s) DRE(s) dele
         if user.is_app_admin and user.is_ponto_focal:
-            user_dres = set(
-                user.unidades
-                    .filter(tipo_unidade=TipoUnidadeChoices.DRE)
-                    .values_list("codigo_eol", flat=True)
-            )
-            obj_dres = set(
-                obj.unidades
-                    .exclude(dre__isnull=True)
-                    .values_list("dre_id", flat=True)
-            )
-            return bool(user_dres & obj_dres)
+            return _ponto_focal_has_access_to_user(user, obj)
 
         # Qualquer outro (não-admin ou outro perfil) → só o próprio registro
         return obj.pk == user.pk
@@ -68,7 +100,7 @@ class CanApproveUser(BasePermission):
     """
     Permissão para aprovar usuários pendentes.
     - GIPE admin: aprova qualquer um.
-    - PF admin: aprova apenas da(s) DRE(s) dele.
+    - PF admin: aprova apenas da(s) DRE(s) dele
     """
 
     def has_permission(self, request, view):
@@ -96,16 +128,6 @@ class CanApproveUser(BasePermission):
 
         # Ponto Focal admin aprova apenas usuários da(s) DRE(s) dele
         if user.is_app_admin and user.is_ponto_focal:
-            user_dres = set(
-                user.unidades
-                    .filter(tipo_unidade=TipoUnidadeChoices.DRE)
-                    .values_list("codigo_eol", flat=True)
-            )
-            obj_dres = set(
-                obj.unidades
-                    .exclude(dre__isnull=True)
-                    .values_list("dre_id", flat=True)
-            )
-            return bool(user_dres & obj_dres)
+            return _ponto_focal_has_access_to_user(user, obj)
 
         return False

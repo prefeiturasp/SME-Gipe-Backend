@@ -1,4 +1,5 @@
 import environ
+from django.db.models import Q
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.http import Http404
@@ -88,7 +89,7 @@ class GestaoUsuarioViewSet(ModelViewSet):
             ).values_list("uuid", flat=True)
 
             base_qs = qs.filter(
-                unidades__dre__uuid__in=dres_pf_uuids
+                Q(unidades__dre__uuid__in=dres_pf_uuids) | Q(unidades__uuid__in=dres_pf_uuids)
             ).distinct()
 
         else:
@@ -98,8 +99,9 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
         dre_uuid = params.get("dre")
         if dre_uuid and user.is_gipe:
+           
             base_qs = base_qs.filter(
-                unidades__dre__uuid=dre_uuid
+                Q(unidades__dre__uuid=dre_uuid) | Q(unidades__uuid=dre_uuid)
             ).distinct()
 
 
