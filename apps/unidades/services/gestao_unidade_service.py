@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 
 from apps.users.models import User
 from apps.users.services.gestao_usuario_service import InativarUsuarioService
+from apps.unidades.models.unidades import TipoGestaoChoices
 
 
 class InativarUnidadeService:
@@ -20,7 +21,7 @@ class InativarUnidadeService:
             self._inativar_usuarios(usuarios)
 
     def _validar_rede(self):
-        if self.unidade.rede != "INDIRETA":
+        if self.unidade.rede != TipoGestaoChoices.INDIRETA:
             raise ValidationError(
                 message="Somente unidades da rede indireta podem ser inativadas."
             )
