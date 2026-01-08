@@ -635,40 +635,6 @@ class TestGestaoUnidadeViewSetAtivar:
 class TestGestaoUnidadeViewSetInativar:
     """Testes para a action inativar."""
 
-    def test_inativar_unidade_gipe_admin(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """GIPE admin pode inativar unidade."""
-        escola_sp.ativa = True
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-inativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade inativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
-
-    def test_inativar_unidade_ponto_focal_sua_dre(
-        self, api_client, user_pf_admin, escola_sp
-    ):
-        """Ponto Focal pode inativar unidades da sua DRE."""
-        escola_sp.ativa = True
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-inativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade inativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
-
     def test_inativar_unidade_ponto_focal_outra_dre(
         self, api_client, user_pf_admin, escola_outra
     ):
@@ -701,22 +667,6 @@ class TestGestaoUnidadeViewSetInativar:
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is True
 
-    def test_inativar_unidade_ja_inativa(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """Inativar uma unidade já inativa não causa erro."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-inativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
-
     def test_inativar_unidade_inexistente(
         self, api_client, user_gipe_admin
     ):
@@ -730,4 +680,48 @@ class TestGestaoUnidadeViewSetInativar:
         response = api_client.post(url)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+    
+    def test_inativar_unidade_rede_direta_retorna_erro(
+        self, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.rede = "DIRETA"
+        escola_sp.ativa = True
+        escola_sp.save()
 
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse(
+            "unidades:gestao-unidades-inativar",
+            kwargs={"uuid": escola_sp.uuid},
+        )
+
+        response = api_client.post(url)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert (
+            response.data["detail"]
+            == "Somente unidades da rede indireta podem ser inativadas."
+        )
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is True
+    
+    def test_inativar_unidade_indireta_sem_usuarios(
+        self, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = True
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse(
+            "unidades:gestao-unidades-inativar",
+            kwargs={"uuid": escola_sp.uuid},
+        )
+
+        response = api_client.post(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == "Unidade e usuários inativados com sucesso."
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
