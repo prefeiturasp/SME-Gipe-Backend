@@ -142,6 +142,25 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             "is_core_sso",
         ]
 
+    def _validate_ponto_focal_unidades(self, user, unidades):
+        """
+        Valida se as unidades estão dentro do escopo do Ponto Focal.
+        """
+        allowed_dres = set(
+            user.unidades.values_list("codigo_eol", flat=True).distinct()
+        )
+        
+        for unidade in unidades:
+            if unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+                if unidade.codigo_eol not in allowed_dres:
+                    raise serializers.ValidationError(
+                        "Ponto Focal só pode cadastrar usuários para sua própria DRE."
+                    )
+            elif unidade.dre_id not in allowed_dres:
+                raise serializers.ValidationError(
+                    "Ponto Focal só pode cadastrar usuários para unidades de sua DRE."
+                )
+
     def validate_unidades(self, unidades):
         """
         Ponto Focal só pode atribuir unidades da própria DRE.
@@ -162,14 +181,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             )
 
         if user.is_ponto_focal:
-            allowed_dres = set(
-                user.unidades.values_list("codigo_eol", flat=True).distinct()
-            )
-            for u in unidades:
-                if u.dre_id not in allowed_dres:
-                    raise serializers.ValidationError(
-                       "Ponto Focal só pode cadastrar usuários para unidades de sua DRE."
-                    )
+            self._validate_ponto_focal_unidades(user, unidades)
 
         return unidades
 
