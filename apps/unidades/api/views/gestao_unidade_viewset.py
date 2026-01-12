@@ -3,6 +3,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import ModelViewSet
+from django.http import Http404
+from rest_framework.exceptions import ValidationError
 
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
 from apps.unidades.api.serializers.gestao_unidade_serializer import (
@@ -15,9 +17,15 @@ class GestaoUnidadeViewSet(ModelViewSet):
 
     queryset = Unidade.objects.select_related("dre").order_by("nome")
     lookup_field = "uuid"
+
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Http404:
+            raise ValidationError({"detail": "Unidade informada não existe."})
     
     def get_serializer_class(self):
-        if self.action == "list" or self.action == "retrieve":
+        if self.action in ("list", "retrieve"):
             return GestaoUnidadeListaSerializer
         return GestaoUnidadeSerializer
 
