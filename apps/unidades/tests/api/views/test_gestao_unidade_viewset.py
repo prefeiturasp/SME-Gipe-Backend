@@ -213,7 +213,7 @@ class TestGestaoUnidadeViewSetRetrieve:
 
         response = api_client.get(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_retrieve_usuario_comum_nao_pode_ver(
         self, api_client, user_comum, escola_sp
@@ -224,12 +224,12 @@ class TestGestaoUnidadeViewSetRetrieve:
 
         response = api_client.get(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_retrieve_unidade_inexistente(
         self, api_client, user_gipe_admin
     ):
-        """Retorna 404 para unidade inexistente."""
+        """Retorna 400 para unidade inexistente."""
         import uuid
         fake_uuid = uuid.uuid4()
 
@@ -238,7 +238,7 @@ class TestGestaoUnidadeViewSetRetrieve:
 
         response = api_client.get(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_retrieve_usa_serializer_lista(
         self, api_client, user_gipe_admin, escola_sp
@@ -470,7 +470,7 @@ class TestGestaoUnidadeViewSetUpdate:
 
         response = api_client.patch(url, data, format="json")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_update_usuario_comum_negado(
         self, api_client, user_comum, escola_sp, dre_sp
@@ -486,7 +486,7 @@ class TestGestaoUnidadeViewSetUpdate:
 
         response = api_client.patch(url, data, format="json")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.django_db
@@ -528,7 +528,7 @@ class TestGestaoUnidadeViewSetDelete:
 
         response = api_client.delete(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert Unidade.objects.filter(uuid=escola_outra.uuid).exists()
 
     def test_delete_usuario_comum_negado(
@@ -540,7 +540,7 @@ class TestGestaoUnidadeViewSetDelete:
 
         response = api_client.delete(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert Unidade.objects.filter(uuid=escola_sp.uuid).exists()
 
 
@@ -594,7 +594,7 @@ class TestGestaoUnidadeViewSetAtivar:
 
         response = api_client.post(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         escola_outra.refresh_from_db()
         assert escola_outra.ativa is False
 
@@ -610,7 +610,7 @@ class TestGestaoUnidadeViewSetAtivar:
 
         response = api_client.post(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is False
 
@@ -647,7 +647,7 @@ class TestGestaoUnidadeViewSetInativar:
 
         response = api_client.post(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         escola_outra.refresh_from_db()
         assert escola_outra.ativa is True
 
@@ -663,14 +663,14 @@ class TestGestaoUnidadeViewSetInativar:
 
         response = api_client.post(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is True
 
     def test_inativar_unidade_inexistente(
         self, api_client, user_gipe_admin
     ):
-        """Retorna 404 ao tentar inativar unidade inexistente."""
+        """Retorna 400 ao tentar inativar unidade inexistente."""
         import uuid
         fake_uuid = uuid.uuid4()
 
@@ -679,7 +679,7 @@ class TestGestaoUnidadeViewSetInativar:
 
         response = api_client.post(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
     
     def test_inativar_unidade_rede_direta_retorna_erro(
         self, api_client, user_gipe_admin, escola_sp

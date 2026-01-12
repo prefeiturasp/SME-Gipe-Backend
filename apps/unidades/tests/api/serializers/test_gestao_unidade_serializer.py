@@ -7,7 +7,7 @@ from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
     GestaoUnidadeListaSerializer,
 )
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
 
 @pytest.mark.django_db
@@ -443,3 +443,80 @@ class TestGestaoUnidadeListaSerializer:
         assert data[1]["nome"] == dre_outra.nome
         assert data[2]["nome"] == escola_sp.nome
         assert data[3]["nome"] == escola_outra.nome
+
+
+@pytest.mark.django_db
+class TestGestaoUnidadeSerializerExceptions:
+
+    def test_create_erro_inesperado_dispara_validation_error(self, api_rf, user_gipe_admin):
+        request = api_rf.post("/fake-url/")
+        request.user = user_gipe_admin
+
+        dre_obj = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.DRE,
+            nome="DRE Teste",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="999999",
+            ativa=True
+        )
+
+        data = {
+            "tipo_unidade": TipoUnidadeChoices.CEI,
+            "nome": "Escola Teste",
+            "rede": TipoGestaoChoices.INDIRETA,
+            "codigo_eol": "123456",
+            "dre": str(dre_obj.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(data=data, context={"request": request})
+
+        assert serializer.is_valid(raise_exception=True)
+
+        with patch.object(Unidade.objects, "create", side_effect=Exception("Erro inesperado")):
+            with pytest.raises(ValidationError) as excinfo:
+                serializer.save()
+
+        assert "Erro inesperado" in str(excinfo.value)
+        assert excinfo.value.detail == {"detail": "Erro inesperado"}
+
+    def test_update_erro_inesperado_dispara_validation_error(self, api_rf, user_gipe_admin):
+        request = api_rf.post("/fake-url/")
+        request.user = user_gipe_admin
+
+        dre_obj = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.DRE,
+            nome="DRE Teste",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="888888",
+            ativa=True
+        )
+
+        unidade = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.CEI,
+            nome="Escola Original",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="654321",
+            dre=dre_obj,
+            ativa=True
+        )
+
+        data = {
+            "nome": "Nome atualizado",
+            "dre": str(dre_obj.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=unidade,
+            data=data,
+            partial=True,
+            context={"request": request}
+        )
+
+        assert serializer.is_valid(raise_exception=True)
+
+        with patch.object(unidade, "save", side_effect=Exception("Erro inesperado update")):
+            with pytest.raises(ValidationError) as excinfo:
+                serializer.save()
+
+        assert "Erro inesperado update" in str(excinfo.value)
+        assert excinfo.value.detail == {"detail": "Erro inesperado update"}
