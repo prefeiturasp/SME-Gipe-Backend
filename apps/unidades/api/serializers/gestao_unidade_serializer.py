@@ -166,8 +166,11 @@ class GestaoUnidadeSerializer(serializers.ModelSerializer):
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
 
-            # dre (se vier)
-            if "dre" in self.initial_data:
+            # Se está mudando para tipo DRE, limpa a referência de DRE
+            if instance.tipo_unidade == TipoUnidadeChoices.DRE:
+                instance.dre = None
+            # Caso contrário, atualiza a DRE se vier no payload
+            elif "dre" in self.initial_data:
                 if dre_uuid:
                     instance.dre = Unidade.objects.get(uuid=dre_uuid)
                 else:

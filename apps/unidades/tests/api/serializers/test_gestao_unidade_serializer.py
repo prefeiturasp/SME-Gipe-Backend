@@ -326,6 +326,109 @@ class TestGestaoUnidadeSerializer:
         assert unidade.tipo_unidade == TipoUnidadeChoices.DRE
         assert unidade.dre is None
 
+    def test_update_nao_dre_com_dre_uuid_valido(
+        self, api_rf, user_gipe_admin, dre_sp, dre_outra
+    ):
+        """update de unidade não-DRE com dre_uuid válido deve atualizar a DRE."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="121212",
+            nome="EMEI Teste",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        # Atualiza para dre_outra
+        data = {
+            "dre": str(dre_outra.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+        assert serializer.is_valid(raise_exception=True)
+
+        unidade = serializer.save()
+
+        assert unidade.dre == dre_outra
+        assert unidade.tipo_unidade == TipoUnidadeChoices.EMEI
+
+    def test_update_nao_dre_remove_dre_com_none_explicito(
+        self, api_rf, user_gipe_admin, dre_sp
+    ):
+        """update de unidade não-DRE com dre=None explícito no payload deve limpar a DRE."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="131313",
+            nome="EMEF Teste",
+            tipo_unidade=TipoUnidadeChoices.EMEF,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        # Tenta remover a DRE com None explícito
+        # Nota: isso deve falhar na validação porque unidades não-DRE precisam ter DRE
+        data = {
+            "dre": None,
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+        
+        # Deve falhar porque EMEF não pode ficar sem DRE
+        with pytest.raises(ValidationError) as excinfo:
+            serializer.is_valid(raise_exception=True)
+
+        assert "DRE é obrigatória" in str(excinfo.value)
+
+    def test_update_nao_dre_com_dre_none_no_payload_bypass_validacao(
+        self, api_rf, user_gipe_admin, dre_sp
+    ):
+        """Testa o else do elif que define instance.dre = None quando dre_uuid é None."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="141414",
+            nome="EMEF Teste Bypass",
+            tipo_unidade=TipoUnidadeChoices.EMEF,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        data = {
+            "nome": "Nome atualizado",
+            "dre": None,
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+
+        # Mocka o método validate para bypassar a validação que impede dre=None
+        def mock_validate(self, attrs):
+            return attrs
+
+        with patch.object(GestaoUnidadeSerializer, 'validate', mock_validate):
+            assert serializer.is_valid()
+            
+            # Mocka full_clean para não falhar na validação do modelo
+            with patch.object(escola, 'full_clean'):
+                unidade = serializer.save()
+                
+                # Verifica que instance.dre foi definido como None
+                assert unidade.dre is None
+                assert unidade.nome == "Nome atualizado"
+
 
 @pytest.mark.django_db
 class TestGestaoUnidadeListaSerializer:
