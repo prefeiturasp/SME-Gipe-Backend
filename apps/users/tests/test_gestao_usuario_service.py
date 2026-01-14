@@ -12,32 +12,6 @@ User = get_user_model()
 class TestInativarUsuarioService:
     """Testes para o service InativarUsuarioService."""
 
-    def test_inativar_usuario_ativo_com_sucesso(self):
-        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
-        usuario = User.objects.create(
-            username="usuario_ativo",
-            cpf="12345678900",
-            name="Usuário Ativo",
-            cargo=cargo,
-            is_active=True,
-        )
-
-        responsavel = "ADMIN001"
-        antes = timezone.now()
-
-        resultado = InativarUsuarioService.inativar(
-            usuario_a_ser_inativado=usuario,
-            usuario_responsavel=responsavel,
-        )
-
-        usuario.refresh_from_db()
-
-        assert resultado == usuario
-        assert usuario.is_active is False
-        assert usuario.responsavel_inativacao == responsavel
-        assert usuario.data_inativacao is not None
-        assert usuario.data_inativacao >= antes
-
     def test_inativar_usuario_ja_inativo_nao_altera_dados(self):
         cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
         data_inativacao = timezone.now()
@@ -77,6 +51,7 @@ class TestInativarUsuarioService:
         InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
             usuario_responsavel="01234567899",
+            motivo_inativacao="Teste"
         )
 
         usuario.refresh_from_db()
@@ -86,24 +61,26 @@ class TestInativarUsuarioService:
         assert usuario.is_active is False
         assert usuario.data_inativacao is not None
         assert usuario.responsavel_inativacao == "01234567899"
+        assert usuario.motivo_inativacao == "Teste"
 
 
 @pytest.mark.django_db
 class TestReativarUsuarioService:
     """Testes para o service ReativarUsuarioService."""
 
-    def test_reativar_usuario_inativo_com_sucesso(self):
+    def test_reativar_usuario_inativo_atualiza_dados_com_sucesso(self):
         cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
-        data_inativacao = timezone.now()
 
         usuario = User.objects.create(
             username="usuario_inativo",
-            cpf="12345678900",
+            cpf="11122233344",
             name="Usuário Inativo",
             cargo=cargo,
             is_active=False,
-            data_inativacao=data_inativacao,
-            responsavel_inativacao="ADMIN001",
+            data_inativacao=timezone.now(),
+            responsavel_inativacao="admin",
+            motivo_inativacao="Teste",
+            inativado_via_unidade=True,
         )
 
         resultado = ReativarUsuarioService.reativar(usuario)
@@ -114,6 +91,8 @@ class TestReativarUsuarioService:
         assert usuario.is_active is True
         assert usuario.data_inativacao is None
         assert usuario.responsavel_inativacao is None
+        assert usuario.motivo_inativacao == ""
+        assert usuario.inativado_via_unidade is False
 
     def test_reativar_usuario_ja_ativo_nao_altera_dados(self):
         cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")

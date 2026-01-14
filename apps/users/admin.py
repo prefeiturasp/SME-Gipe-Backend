@@ -108,7 +108,8 @@ class UserAdmin(BaseUserAdmin):
             'fields': (
                 'name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades', 'is_validado', 'is_app_admin', 'is_core_sso',
                 'data_aprovacao', 'responsavel_aprovacao',
-                'data_inativacao', 'responsavel_inativacao'
+                'data_inativacao', 'responsavel_inativacao',
+                'motivo_inativacao', 'inativado_via_unidade'
             )
         }),
     )

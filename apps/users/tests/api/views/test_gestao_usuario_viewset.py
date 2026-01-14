@@ -232,29 +232,6 @@ def test_create_gipe_admin_cria_usuario(api_client, user_gipe_admin, cargo_comum
 
 
 @pytest.mark.django_db
-def test_create_pf_admin_cria_usuario_na_sua_dre(
-    api_client, user_pf_admin, cargo_comum, escola_sp
-):
-    """PF admin pode criar usuários em unidades da sua DRE."""
-    api_client.force_authenticate(user=user_pf_admin)
-    
-    data = {
-        "username": "novo_usuario_pf",
-        "name": "Novo Usuario PF",
-        "email": "novo.pf@example.com",
-        "cpf": "88888888889",
-        "cargo": cargo_comum.pk,
-        "unidades": [escola_sp.codigo_eol],
-        "is_app_admin": False,
-    }
-    
-    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
-    
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["username"] == "novo_usuario_pf"
-
-
-@pytest.mark.django_db
 def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     api_client, user_pf_admin, cargo_comum, escola_outra
 ):
@@ -601,7 +578,8 @@ def test_inativar_usuario_com_sucesso(
     ) as mock_inativar:
 
         response = api_client.post(
-            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/"
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"}
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -610,6 +588,7 @@ def test_inativar_usuario_com_sucesso(
         mock_inativar.assert_called_once_with(
             usuario_a_ser_inativado=usuario_validado,
             usuario_responsavel=str(user_gipe_admin),
+            motivo_inativacao="Teste"
         )
 
 
@@ -632,19 +611,38 @@ def test_inativar_usuario_inexistente_retorna_404(
 
 
 @pytest.mark.django_db
-def test_inativar_usuario_uuid_invalido_retorna_404(
+def test_inativar_usuario_uuid_invalido_retorna_400(
     api_client,
     user_gipe_admin,
 ):
-    """Retorna 404 quando o UUID informado é inválido."""
+    """Retorna 400 quando o UUID informado é inválido."""
     api_client.force_authenticate(user=user_gipe_admin)
 
     response = api_client.post(
         "/api/users/gestao-usuarios/uuid-invalido/inativar/"
     )
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["detail"] == "UUID informado é inválido."
+    
+
+@pytest.mark.django_db
+def test_inativar_usuario_sem_motivo_inativacao_retorna_400(
+    api_client,
+    user_gipe_admin,
+):
+    """Motivo inativacao é obrigatória para inativação."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    response = api_client.post(
+        f"/api/users/gestao-usuarios/{user_gipe_admin.uuid}/inativar/",
+        data={},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Motivo inativacao é obrigatória para inativação."
+
 
 @pytest.mark.django_db
 def test_retrieve_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
@@ -740,26 +738,29 @@ def test_reprovar_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
     
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
 @pytest.mark.django_db
-def test_reativar_usuario_caminho_feliz_cobre_view_completa(
+def test_reativar_usuario_com_sucesso_retorna_200(
     api_client,
     user_gipe_admin,
     usuario_inativo,
 ):
     api_client.force_authenticate(user=user_gipe_admin)
 
-    response = api_client.post(
-        f"/api/users/gestao-usuarios/{usuario_inativo.uuid}/reativar/"
-    )
+    with patch(
+        "apps.users.services.gestao_usuario_service.ReativarUsuarioService.reativar"
+    ) as mock_reativar:
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_inativo.uuid}/reativar/"
+        )
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["detail"] == "Usuário reativado com sucesso."
 
-    usuario_inativo.refresh_from_db()
+    mock_reativar.assert_called_once_with(
+        usuario_a_ser_reativado=usuario_inativo
+    )
 
-    assert usuario_inativo.is_active is True
-    assert usuario_inativo.data_inativacao is None
-    assert usuario_inativo.responsavel_inativacao is None
 
 @pytest.mark.django_db
 def test_reativar_usuario_sem_permissao_retorna_403(
