@@ -228,22 +228,40 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
     @action(detail=True, methods=["post"], permission_classes=[CanApproveUser])
     def inativar(self, request, uuid=None):
-        
 
         try:
             UUID(uuid)
         except (ValueError, TypeError):
             return Response(
                 {"detail": "UUID informado é inválido."},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_400_BAD_REQUEST
             )
             
         usuario = self.get_object()
+        motivo_inativacao = request.data.get("motivo_inativacao")
 
+        if not motivo_inativacao:
+            return Response(
+                {"detail": "Motivo inativacao é obrigatória para inativação."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
-            usuario_responsavel=str(request.user)
+            usuario_responsavel=str(request.user),
+            motivo_inativacao=motivo_inativacao
+        )
+
+        contexto_email = {
+            "nome_usuario": usuario.name,
+            "motivo_inativacao": motivo_inativacao,
+        }
+
+        EnviaEmailService.enviar(
+            destinatario=usuario.email,
+            assunto="Inativação de perfil no GIPE",
+            template_html="emails/inativacao_usuario.html",
+            contexto=contexto_email,
         )
 
         return Response(
