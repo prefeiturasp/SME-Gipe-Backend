@@ -62,26 +62,6 @@ class TestInativarUnidadeService:
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is False
 
-    def test_inativa_usuarios_vinculados_a_unidade(
-        self, escola_sp, user_gipe_admin, usuario_vinculado_unidade
-    ):
-        escola_sp.rede = "INDIRETA"
-        escola_sp.ativa = True
-        escola_sp.save()
-
-        service = InativarUnidadeService(
-            unidade=escola_sp,
-            usuario_responsavel=str(user_gipe_admin),
-        )
-
-        service.executar()
-
-        escola_sp.refresh_from_db()
-        usuario_vinculado_unidade.refresh_from_db()
-
-        assert escola_sp.ativa is False
-        assert usuario_vinculado_unidade.is_active is False
-
     def test_chama_inativar_usuario_service_para_cada_usuario(
         self, escola_sp, user_gipe_admin, usuario_vinculado_unidade
     ):

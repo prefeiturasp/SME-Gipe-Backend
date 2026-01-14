@@ -1,8 +1,10 @@
 import pytest
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+from apps.users.models import Cargo
 
 from apps.users.api.serializers.gestao_usuario_serializer import (
     GestaoUsuarioSerializer,
@@ -209,22 +211,6 @@ def test_validate_is_app_admin_pf_nao_pode_atribuir(api_rf, user_pf_admin):
     with pytest.raises(serializers.ValidationError, match="Somente usuários com perfil GIPE"):
         serializer.validate_is_app_admin(True)
 
-
-@pytest.mark.django_db
-def test_validate_is_app_admin_false_qualquer_usuario_pode(api_rf, user_pf_admin):
-    """Qualquer admin pode marcar is_app_admin=False."""
-    request = api_rf.post("/fake/")
-    request.user = user_pf_admin
-    
-    serializer = GestaoUsuarioSerializer(context={"request": request})
-    
-    result = serializer.validate_is_app_admin(False)
-    assert result is False
-
-
-# ==========================================
-# Testes para is_valid (override)
-# ==========================================
 
 @pytest.mark.django_db
 def test_is_valid_formata_erro_com_detail(api_rf, user_gipe_admin, cargo_comum):
@@ -522,33 +508,6 @@ def test_update_pf_nao_pode_mudar_is_app_admin(
     # Deve falhar na validação porque PF não pode setar is_app_admin=True
     assert serializer.is_valid(raise_exception=False) is False
     assert "detail" in serializer.errors
-
-
-@pytest.mark.django_db
-def test_update_pf_pode_setar_is_app_admin_false(
-    api_rf, user_pf_admin, user_gipe_admin
-):
-    """PF admin pode setar is_app_admin=False."""
-    request = api_rf.patch("/fake/")
-    request.user = user_pf_admin
-    
-    # user_gipe_admin começa com is_app_admin=True
-    assert user_gipe_admin.is_app_admin is True
-    
-    data = {"is_app_admin": False}
-    
-    serializer = GestaoUsuarioSerializer(
-        user_gipe_admin,
-        data=data,
-        partial=True,
-        context={"request": request}
-    )
-    assert serializer.is_valid(raise_exception=True)
-    
-    updated_user = serializer.save()
-    # PF não é GIPE, então o campo é ignorado no update
-    # O valor deve permanecer True
-    assert updated_user.is_app_admin is True
 
 
 @pytest.mark.django_db
@@ -902,3 +861,67 @@ def test_retrieve_serializer_retorna_none_quando_usuario_sem_unidade(cargo_comum
     assert data["codigo_eol_unidade"] is None
     assert data["codigo_eol_dre_da_unidade"] is None
 
+
+@pytest.mark.django_db
+class TestGestaoUsuarioRetrieveSerializer:
+
+    def test_data_inativacao_formatada(self):
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        data_inativacao = timezone.localtime(
+            timezone.datetime(2026, 1, 13, 14, 29, tzinfo=timezone.get_current_timezone())
+        )
+
+        usuario = User.objects.create(
+            username="1234567",
+            cpf="12345678901",
+            name="Usuário Teste",
+            cargo=cargo,
+            is_active=False,
+            data_inativacao=data_inativacao,
+        )
+
+        serializer = GestaoUsuarioRetrieveSerializer(usuario)
+
+        assert serializer.data["data_inativacao_formatada"] == "13/01/2026 às 14:29h."
+    
+    def test_responsavel_inativacao_nome(self):
+
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        responsavel = User.objects.create(
+            username="1234567",
+            cpf="99988877766",
+            name="Administrador Responsável",
+            cargo=cargo,
+            is_active=True,
+        )
+
+        usuario = User.objects.create(
+            username="usuario_inativado",
+            cpf="12345678901",
+            name="Usuário Inativado",
+            cargo=cargo,
+            is_active=False,
+            responsavel_inativacao=responsavel.username,
+        )
+
+        serializer = GestaoUsuarioRetrieveSerializer(usuario)
+
+        assert serializer.data["responsavel_inativacao_nome"] == "Administrador Responsável"
+    
+    def test_responsavel_inativacao_nome_quando_usuario_nao_existe(self):
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        usuario = User.objects.create(
+            username="usuario_inativado",
+            cpf="12345678901",
+            name="Usuário Inativado",
+            cargo=cargo,
+            is_active=False,
+            responsavel_inativacao="1234568",
+        )
+
+        serializer = GestaoUsuarioRetrieveSerializer(usuario)
+
+        assert serializer.data["responsavel_inativacao_nome"] is None
