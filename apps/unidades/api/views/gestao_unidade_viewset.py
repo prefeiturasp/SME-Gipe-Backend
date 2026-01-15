@@ -84,23 +84,24 @@ class GestaoUnidadeViewSet(ModelViewSet):
     @action(detail=True, methods=["post"], url_path="inativar")
     def inativar(self, request, uuid=None):
         unidade = self.get_object()
+        motivo_inativacao = request.data.get("motivo_inativacao")
 
-        try:
-            InativarUnidadeService(
-                unidade=unidade,
-                usuario_responsavel=str(request.user)
-            ).executar()
+        if not motivo_inativacao:
+            return Response(
+                {"detail": "Motivo inativação é obrigatória para executar a inativação."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            return Response(
-                {"detail": "Unidade e usuários inativados com sucesso."},
-                status=status.HTTP_200_OK
-            )
-        
-        except Exception as err:
-            return Response(
-                {"detail": err.message},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        InativarUnidadeService(
+            unidade=unidade,
+            usuario_responsavel=str(request.user),
+            motivo_inativacao=motivo_inativacao
+        ).executar()
+
+        return Response(
+            {"detail": "Unidade e usuários inativados com sucesso."},
+            status=status.HTTP_200_OK
+        )
         
     @action(detail=False, methods=['get'], url_path='tipos-unidade')
     def tipos_unidade(self, _):
