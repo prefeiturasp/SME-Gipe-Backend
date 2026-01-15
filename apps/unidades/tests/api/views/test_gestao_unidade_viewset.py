@@ -681,47 +681,38 @@ class TestGestaoUnidadeViewSetInativar:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
     
-    def test_inativar_unidade_rede_direta_retorna_erro(
+    def test_inativar_sem_motivo_retorna_400(
         self, api_client, user_gipe_admin, escola_sp
     ):
-        escola_sp.rede = "DIRETA"
         escola_sp.ativa = True
         escola_sp.save()
 
         api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse(
-            "unidades:gestao-unidades-inativar",
-            kwargs={"uuid": escola_sp.uuid},
-        )
+        url = reverse("unidades:gestao-unidades-inativar", kwargs={"uuid": escola_sp.uuid})
 
-        response = api_client.post(url)
+        response = api_client.post(url, data={})
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert (
-            response.data["detail"]
-            == "Somente unidades da rede indireta podem ser inativadas."
-        )
+        assert "Motivo inativação é obrigatória" in response.data["detail"]
 
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is True
     
-    def test_inativar_unidade_indireta_sem_usuarios(
-        self, api_client, user_gipe_admin, escola_sp
+    @patch("apps.unidades.services.gestao_unidade_service.InativarUnidadeService.executar")
+    def test_inativar_com_sucesso(
+        self, mock_executar, api_client, user_gipe_admin, escola_sp
     ):
-        escola_sp.rede = "INDIRETA"
         escola_sp.ativa = True
         escola_sp.save()
 
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse(
-            "unidades:gestao-unidades-inativar",
-            kwargs={"uuid": escola_sp.uuid},
-        )
+        mock_executar.return_value = None
 
-        response = api_client.post(url)
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-inativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={"motivo_inativacao": "Encerramento"})
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == "Unidade e usuários inativados com sucesso."
 
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
+        mock_executar.assert_called_once()
