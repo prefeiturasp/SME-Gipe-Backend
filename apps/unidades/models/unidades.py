@@ -73,6 +73,27 @@ class Unidade(ModeloBase, TemNome):
         help_text="Indica se a unidade está ativa ou inativa."
     )
 
+    data_inativacao = models.DateTimeField(
+        "Data de Inativação",
+        null=True,
+        blank=True,
+        help_text="Data e hora que a unidade foi inativada"
+    )
+
+    responsavel_inativacao = models.CharField(
+        "Responsável pela Inativação",
+        max_length=11,
+        null=True,
+        blank=True,
+        help_text="Codigo responsável pela inativação"
+    )
+
+    motivo_inativacao = models.TextField(
+        verbose_name="Motivo Inativação",
+        help_text="Descrição do motivo da inativação da unidade.",
+        blank=True,
+    )
+
     # Managers
     objects = models.Manager()
     dres = DresManager()
