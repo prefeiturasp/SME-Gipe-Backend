@@ -1,7 +1,9 @@
 import pytest
+from django.utils import timezone
 from unittest.mock import Mock, patch
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 
 from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
@@ -9,6 +11,7 @@ from apps.unidades.api.serializers.gestao_unidade_serializer import (
 )
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
+User = get_user_model()
 
 @pytest.mark.django_db
 class TestGestaoUnidadeSerializer:
@@ -623,3 +626,83 @@ class TestGestaoUnidadeSerializerExceptions:
 
         assert "Erro inesperado update" in str(excinfo.value)
         assert excinfo.value.detail == {"detail": "Erro inesperado update"}
+    
+    def test_data_inativacao_formatada_quando_existe(self, dre_sp):
+        data = timezone.now()
+
+        unidade = Unidade.objects.create(
+            codigo_eol="999001",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            data_inativacao=data,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        result = serializer.data["data_inativacao_formatada"]
+
+        data_local = timezone.localtime(data).strftime("%d/%m/%Y às %H:%Mh.")
+        assert result == data_local
+
+    def test_data_inativacao_formatada_quando_none(self, dre_sp):
+        unidade = Unidade.objects.create(
+            codigo_eol="999002",
+            nome="Unidade Ativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=True,
+            data_inativacao=None,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["data_inativacao_formatada"] is None
+    
+    def test_responsavel_inativacao_nome_quando_existe(self, dre_sp):
+        user = User.objects.create_user(
+            username="joao.teste",
+            name="João da Silva",
+        )
+
+        unidade = Unidade.objects.create(
+            codigo_eol="999003",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            responsavel_inativacao=user.username,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["responsavel_inativacao_nome"] == "João da Silva"
+
+    def test_responsavel_inativacao_nome_quando_username_nao_existe(self, dre_sp):
+        unidade = Unidade.objects.create(
+            codigo_eol="999004",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            responsavel_inativacao="123456",
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["responsavel_inativacao_nome"] is None
+
+    def test_responsavel_inativacao_nome_quando_none(self, dre_sp):
+        unidade = Unidade.objects.create(
+            codigo_eol="999005",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            responsavel_inativacao=None,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["responsavel_inativacao_nome"] is None

@@ -29,6 +29,8 @@ class TestInativarUsuarioService:
         resultado = InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
             usuario_responsavel="NOVO_ADMIN",
+            motivo_inativacao="Teste",
+            flag_via_unidade=False
         )
 
         usuario.refresh_from_db()
@@ -37,6 +39,8 @@ class TestInativarUsuarioService:
         assert usuario.is_active is False
         assert usuario.data_inativacao == data_inativacao
         assert usuario.responsavel_inativacao == "01234567899"
+        assert usuario.motivo_inativacao == ""
+        assert usuario.inativado_via_unidade == False
 
     def test_inativar_usuario_nao_altera_outros_campos(self):
         cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
@@ -51,7 +55,8 @@ class TestInativarUsuarioService:
         InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
             usuario_responsavel="01234567899",
-            motivo_inativacao="Teste"
+            motivo_inativacao="Teste",
+            flag_via_unidade=False
         )
 
         usuario.refresh_from_db()
@@ -62,7 +67,8 @@ class TestInativarUsuarioService:
         assert usuario.data_inativacao is not None
         assert usuario.responsavel_inativacao == "01234567899"
         assert usuario.motivo_inativacao == "Teste"
-
+        assert usuario.inativado_via_unidade is False
+        
 
 @pytest.mark.django_db
 class TestReativarUsuarioService:

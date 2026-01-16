@@ -242,14 +242,15 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
         if not motivo_inativacao:
             return Response(
-                {"detail": "Motivo inativacao é obrigatória para inativação."},
+                {"detail": "Motivo inativação é obrigatória para executar a inativação."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         InativarUsuarioService.inativar(
             usuario_a_ser_inativado=usuario,
             usuario_responsavel=str(request.user),
-            motivo_inativacao=motivo_inativacao
+            motivo_inativacao=motivo_inativacao,
+            flag_via_unidade=False
         )
 
         contexto_email = {

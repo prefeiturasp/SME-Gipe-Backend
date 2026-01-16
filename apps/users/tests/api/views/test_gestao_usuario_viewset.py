@@ -588,7 +588,8 @@ def test_inativar_usuario_com_sucesso(
         mock_inativar.assert_called_once_with(
             usuario_a_ser_inativado=usuario_validado,
             usuario_responsavel=str(user_gipe_admin),
-            motivo_inativacao="Teste"
+            motivo_inativacao="Teste",
+            flag_via_unidade=False
         )
 
 
@@ -641,7 +642,7 @@ def test_inativar_usuario_sem_motivo_inativacao_retorna_400(
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["detail"] == "Motivo inativacao é obrigatória para inativação."
+    assert response.data["detail"] == "Motivo inativação é obrigatória para executar a inativação."
 
 
 @pytest.mark.django_db
@@ -775,6 +776,7 @@ def test_reativar_usuario_sem_permissao_retorna_403(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    
 
 @pytest.mark.django_db
 def test_reativar_usuario_uuid_invalido_retorna_404(

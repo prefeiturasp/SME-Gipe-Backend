@@ -4,7 +4,7 @@ from django.db import transaction
 class InativarUsuarioService:
 
     @staticmethod
-    def inativar(usuario_a_ser_inativado, usuario_responsavel, motivo_inativacao=None):
+    def inativar(usuario_a_ser_inativado, usuario_responsavel, motivo_inativacao, flag_via_unidade):
 
         if not usuario_a_ser_inativado.is_active:
             return usuario_a_ser_inativado
@@ -14,7 +14,7 @@ class InativarUsuarioService:
             usuario_a_ser_inativado.data_inativacao = timezone.now()
             usuario_a_ser_inativado.responsavel_inativacao = usuario_responsavel
             usuario_a_ser_inativado.motivo_inativacao = motivo_inativacao
-            usuario_a_ser_inativado.inativado_via_unidade = False
+            usuario_a_ser_inativado.inativado_via_unidade = flag_via_unidade
 
             usuario_a_ser_inativado.save(
                 update_fields=[

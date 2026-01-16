@@ -1,8 +1,12 @@
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
+User = get_user_model()
 
 class GestaoUnidadeSerializer(serializers.ModelSerializer):
     """
@@ -189,6 +193,8 @@ class GestaoUnidadeListaSerializer(serializers.ModelSerializer):
     dre_nome = serializers.SerializerMethodField()
     dre_uuid = serializers.SerializerMethodField()
     sigla = serializers.SerializerMethodField()
+    data_inativacao_formatada = serializers.SerializerMethodField()
+    responsavel_inativacao_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = Unidade
@@ -204,6 +210,11 @@ class GestaoUnidadeListaSerializer(serializers.ModelSerializer):
             "dre_nome",
             "sigla",
             "ativa",
+            "data_inativacao",
+            "data_inativacao_formatada",
+            "responsavel_inativacao",
+            "responsavel_inativacao_nome",
+            "motivo_inativacao",
         ]
 
     def get_dre_nome(self, obj):
@@ -220,3 +231,22 @@ class GestaoUnidadeListaSerializer(serializers.ModelSerializer):
         if obj.tipo_unidade == TipoUnidadeChoices.DRE:
             return obj.sigla
         return obj.dre.sigla if obj.dre else ""
+    
+    def get_data_inativacao_formatada(self, obj):
+        if not obj.data_inativacao:
+            return None
+
+        data_local = timezone.localtime(obj.data_inativacao)
+        return data_local.strftime("%d/%m/%Y às %H:%Mh.")
+    
+    def get_responsavel_inativacao_nome(self, obj):
+        if not obj.responsavel_inativacao:
+            return None
+
+        try:
+            user = User.objects.only("name").get(
+                username=obj.responsavel_inativacao
+            )
+            return user.name
+        except User.DoesNotExist:
+            return None
