@@ -83,7 +83,6 @@ class Unidade(ModeloBase, TemNome):
     responsavel_inativacao = models.CharField(
         "Responsável pela Inativação",
         max_length=11,
-        null=True,
         blank=True,
         help_text="Codigo responsável pela inativação"
     )
