@@ -692,17 +692,3 @@ class TestGestaoUnidadeSerializerExceptions:
 
         serializer = GestaoUnidadeListaSerializer(unidade)
         assert serializer.data["responsavel_inativacao_nome"] is None
-
-    def test_responsavel_inativacao_nome_quando_none(self, dre_sp):
-        unidade = Unidade.objects.create(
-            codigo_eol="999005",
-            nome="Unidade Inativa",
-            tipo_unidade=TipoUnidadeChoices.EMEI,
-            rede="DIRETA",
-            dre=dre_sp,
-            ativa=False,
-            responsavel_inativacao=None,
-        )
-
-        serializer = GestaoUnidadeListaSerializer(unidade)
-        assert serializer.data["responsavel_inativacao_nome"] is None
