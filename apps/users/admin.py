@@ -90,12 +90,17 @@ class UserAdmin(BaseUserAdmin):
     add_form = CustomUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
     # Campos exibidos na lista de usuários
-    list_display = ('username', 'name', 'email', 'cargo', 'rede', 'is_validado', 'is_core_sso')
+    list_display = ('username', 'name', 'email', 'cargo', 'rede', 'is_validado', 'is_core_sso', 'get_unidades')
     
     search_fields = ('username', 'name', 'email', 'cpf')
     ordering = ('username',)
 
-    list_filter = ('rede', 'is_validado', 'is_core_sso') # + BaseUserAdmin.list_filter
+    def get_unidades(self, obj):
+        """Retorna as unidades do usuário como string"""
+        return ", ".join([str(unidade) for unidade in obj.unidades.all()]) or "-"
+    get_unidades.short_description = "Unidades"
+
+    list_filter = ('rede', 'is_validado', 'is_core_sso')
 
     # Configuração dos fieldsets (formulário de edição)
     fieldsets = BaseUserAdmin.fieldsets + (
@@ -103,7 +108,8 @@ class UserAdmin(BaseUserAdmin):
             'fields': (
                 'name', 'cpf', 'cargo', 'uuid', 'rede', 'unidades', 'is_validado', 'is_app_admin', 'is_core_sso',
                 'data_aprovacao', 'responsavel_aprovacao',
-                'data_inativacao', 'responsavel_inativacao'
+                'data_inativacao', 'responsavel_inativacao',
+                'motivo_inativacao', 'inativado_via_unidade'
             )
         }),
     )

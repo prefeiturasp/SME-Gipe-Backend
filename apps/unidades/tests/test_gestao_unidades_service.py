@@ -1,0 +1,132 @@
+import pytest
+import secrets
+
+from unittest.mock import patch
+from rest_framework.exceptions import ValidationError
+
+from apps.users.models import User
+from apps.unidades.services.gestao_unidade_service import InativarUnidadeService
+
+@pytest.fixture
+def usuario_vinculado_unidade(db, escola_sp):
+    pwd = secrets.token_urlsafe(16)
+    usuario = User.objects.create(
+        username="usuario_unidade",
+        email="usuario_unidade@test.com",
+        is_active=True,
+    )
+    usuario.set_password(pwd)
+    usuario.save()
+    usuario.unidades.add(escola_sp)
+
+    return usuario
+
+@pytest.mark.django_db
+class TestInativarUnidadeService:
+    """Testes do service InativarUnidadeService."""
+
+    def test_nao_permite_inativar_unidade_rede_diferente_indireta(
+        self, escola_sp, user_gipe_admin
+    ):
+        escola_sp.rede = "DIRETA"
+        escola_sp.ativa = True
+        escola_sp.save()
+
+        service = InativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_inativacao="Teste"
+        )
+
+        with pytest.raises(ValidationError) as exc:
+            service.executar()
+
+        assert str(exc.value.detail["detail"]) == (
+            "Somente unidades da rede indireta podem ser inativadas."
+        )
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is True
+        assert escola_sp.motivo_inativacao == ""
+
+    def test_inativa_unidade_rede_indireta(
+        self, escola_sp, user_gipe_admin
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = True
+        escola_sp.save()
+
+        service = InativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_inativacao="Teste"
+        )
+
+        service.executar()
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+        assert escola_sp.motivo_inativacao == "Teste"
+
+    def test_rollback_se_falhar_inativacao_de_usuario(
+        self, escola_sp, user_gipe_admin, usuario_vinculado_unidade
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = True
+        escola_sp.save()
+
+        service = InativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_inativacao="Teste",
+        )
+
+        with patch(
+            "apps.users.services.gestao_usuario_service.InativarUsuarioService.inativar",
+            side_effect=ValidationError("Erro ao inativar usuário"),
+        ):
+            with pytest.raises(ValidationError):
+                service.executar()
+
+        escola_sp.refresh_from_db()
+        usuario_vinculado_unidade.refresh_from_db()
+
+        assert escola_sp.ativa is True
+        assert usuario_vinculado_unidade.is_active is True
+    
+    def test_envia_email_com_contexto_correto_para_usuario_inativado(
+        self, escola_sp, user_gipe_admin, usuario_vinculado_unidade
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = True
+        escola_sp.nome = "Escola Teste"
+        escola_sp.save()
+
+        service = InativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_inativacao="Motivo X",
+        )
+
+        with patch(
+            "apps.users.services.gestao_usuario_service.InativarUsuarioService.inativar"
+        ) as mock_inativar_usuario, patch(
+            "apps.users.services.envia_email_service.EnviaEmailService.enviar"
+        ) as mock_enviar_email:
+
+            service.executar()
+
+            mock_inativar_usuario.assert_called_once()
+            mock_enviar_email.assert_called_once()
+
+            kwargs = mock_enviar_email.call_args.kwargs
+
+            assert kwargs["destinatario"] == usuario_vinculado_unidade.email
+            assert kwargs["assunto"] == "Inativação da Unidade Educacional no GIPE"
+            assert kwargs["template_html"] == "emails/inativacao_unidade.html"
+
+            assert kwargs["contexto"] == {
+                "nome_usuario": usuario_vinculado_unidade.name,
+                "motivo_inativacao": "Motivo X",
+                "nome_ue": "Escola Teste",
+            }

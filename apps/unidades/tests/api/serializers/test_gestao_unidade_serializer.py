@@ -1,14 +1,17 @@
 import pytest
+from django.utils import timezone
 from unittest.mock import Mock, patch
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 
 from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
     GestaoUnidadeListaSerializer,
 )
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
+User = get_user_model()
 
 @pytest.mark.django_db
 class TestGestaoUnidadeSerializer:
@@ -326,6 +329,109 @@ class TestGestaoUnidadeSerializer:
         assert unidade.tipo_unidade == TipoUnidadeChoices.DRE
         assert unidade.dre is None
 
+    def test_update_nao_dre_com_dre_uuid_valido(
+        self, api_rf, user_gipe_admin, dre_sp, dre_outra
+    ):
+        """update de unidade não-DRE com dre_uuid válido deve atualizar a DRE."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="121212",
+            nome="EMEI Teste",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        # Atualiza para dre_outra
+        data = {
+            "dre": str(dre_outra.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+        assert serializer.is_valid(raise_exception=True)
+
+        unidade = serializer.save()
+
+        assert unidade.dre == dre_outra
+        assert unidade.tipo_unidade == TipoUnidadeChoices.EMEI
+
+    def test_update_nao_dre_remove_dre_com_none_explicito(
+        self, api_rf, user_gipe_admin, dre_sp
+    ):
+        """update de unidade não-DRE com dre=None explícito no payload deve limpar a DRE."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="131313",
+            nome="EMEF Teste",
+            tipo_unidade=TipoUnidadeChoices.EMEF,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        # Tenta remover a DRE com None explícito
+        # Nota: isso deve falhar na validação porque unidades não-DRE precisam ter DRE
+        data = {
+            "dre": None,
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+        
+        # Deve falhar porque EMEF não pode ficar sem DRE
+        with pytest.raises(ValidationError) as excinfo:
+            serializer.is_valid(raise_exception=True)
+
+        assert "DRE é obrigatória" in str(excinfo.value)
+
+    def test_update_nao_dre_com_dre_none_no_payload_bypass_validacao(
+        self, api_rf, user_gipe_admin, dre_sp
+    ):
+        """Testa o else do elif que define instance.dre = None quando dre_uuid é None."""
+        request = api_rf.patch("/fake-url/")
+        request.user = user_gipe_admin
+
+        # Cria uma escola vinculada à dre_sp
+        escola = Unidade.objects.create(
+            codigo_eol="141414",
+            nome="EMEF Teste Bypass",
+            tipo_unidade=TipoUnidadeChoices.EMEF,
+            rede="DIRETA",
+            dre=dre_sp,
+        )
+
+        data = {
+            "nome": "Nome atualizado",
+            "dre": None,
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=escola, data=data, partial=True, context={"request": request}
+        )
+
+        # Mocka o método validate para bypassar a validação que impede dre=None
+        def mock_validate(self, attrs):
+            return attrs
+
+        with patch.object(GestaoUnidadeSerializer, 'validate', mock_validate):
+            assert serializer.is_valid()
+            
+            # Mocka full_clean para não falhar na validação do modelo
+            with patch.object(escola, 'full_clean'):
+                unidade = serializer.save()
+                
+                # Verifica que instance.dre foi definido como None
+                assert unidade.dre is None
+                assert unidade.nome == "Nome atualizado"
+
 
 @pytest.mark.django_db
 class TestGestaoUnidadeListaSerializer:
@@ -443,3 +549,146 @@ class TestGestaoUnidadeListaSerializer:
         assert data[1]["nome"] == dre_outra.nome
         assert data[2]["nome"] == escola_sp.nome
         assert data[3]["nome"] == escola_outra.nome
+
+
+@pytest.mark.django_db
+class TestGestaoUnidadeSerializerExceptions:
+
+    def test_create_erro_inesperado_dispara_validation_error(self, api_rf, user_gipe_admin):
+        request = api_rf.post("/fake-url/")
+        request.user = user_gipe_admin
+
+        dre_obj = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.DRE,
+            nome="DRE Teste",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="999999",
+            ativa=True
+        )
+
+        data = {
+            "tipo_unidade": TipoUnidadeChoices.CEI,
+            "nome": "Escola Teste",
+            "rede": TipoGestaoChoices.INDIRETA,
+            "codigo_eol": "123456",
+            "dre": str(dre_obj.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(data=data, context={"request": request})
+
+        assert serializer.is_valid(raise_exception=True)
+
+        with patch.object(Unidade.objects, "create", side_effect=Exception("Erro inesperado")):
+            with pytest.raises(ValidationError) as excinfo:
+                serializer.save()
+
+        assert "Erro inesperado" in str(excinfo.value)
+        assert excinfo.value.detail == {"detail": "Erro inesperado"}
+
+    def test_update_erro_inesperado_dispara_validation_error(self, api_rf, user_gipe_admin):
+        request = api_rf.post("/fake-url/")
+        request.user = user_gipe_admin
+
+        dre_obj = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.DRE,
+            nome="DRE Teste",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="888888",
+            ativa=True
+        )
+
+        unidade = Unidade.objects.create(
+            tipo_unidade=TipoUnidadeChoices.CEI,
+            nome="Escola Original",
+            rede=TipoGestaoChoices.INDIRETA,
+            codigo_eol="654321",
+            dre=dre_obj,
+            ativa=True
+        )
+
+        data = {
+            "nome": "Nome atualizado",
+            "dre": str(dre_obj.uuid),
+        }
+
+        serializer = GestaoUnidadeSerializer(
+            instance=unidade,
+            data=data,
+            partial=True,
+            context={"request": request}
+        )
+
+        assert serializer.is_valid(raise_exception=True)
+
+        with patch.object(unidade, "save", side_effect=Exception("Erro inesperado update")):
+            with pytest.raises(ValidationError) as excinfo:
+                serializer.save()
+
+        assert "Erro inesperado update" in str(excinfo.value)
+        assert excinfo.value.detail == {"detail": "Erro inesperado update"}
+    
+    def test_data_inativacao_formatada_quando_existe(self, dre_sp):
+        data = timezone.now()
+
+        unidade = Unidade.objects.create(
+            codigo_eol="999001",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            data_inativacao=data,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        result = serializer.data["data_inativacao_formatada"]
+
+        data_local = timezone.localtime(data).strftime("%d/%m/%Y às %H:%Mh.")
+        assert result == data_local
+
+    def test_data_inativacao_formatada_quando_none(self, dre_sp):
+        unidade = Unidade.objects.create(
+            codigo_eol="999002",
+            nome="Unidade Ativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=True,
+            data_inativacao=None,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["data_inativacao_formatada"] is None
+    
+    def test_responsavel_inativacao_nome_quando_existe(self, dre_sp):
+        user = User.objects.create_user(
+            username="joao.teste",
+            name="João da Silva",
+        )
+
+        unidade = Unidade.objects.create(
+            codigo_eol="999003",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            responsavel_inativacao=user.username,
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["responsavel_inativacao_nome"] == "João da Silva"
+
+    def test_responsavel_inativacao_nome_quando_username_nao_existe(self, dre_sp):
+        unidade = Unidade.objects.create(
+            codigo_eol="999004",
+            nome="Unidade Inativa",
+            tipo_unidade=TipoUnidadeChoices.EMEI,
+            rede="DIRETA",
+            dre=dre_sp,
+            ativa=False,
+            responsavel_inativacao="123456",
+        )
+
+        serializer = GestaoUnidadeListaSerializer(unidade)
+        assert serializer.data["responsavel_inativacao_nome"] is None

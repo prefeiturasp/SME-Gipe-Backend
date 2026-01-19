@@ -32,12 +32,10 @@ class User(AbstractUser):
     is_validado = models.BooleanField("Validado", default=False, help_text="Indica se o usuário foi validado")
     is_core_sso = models.BooleanField("CoreSSO", default=False, help_text="Indica se o usuário possue cadastro no coreSSO")
     
-    
     # mapeamento dos códigos de cargo para facilitar as permissões
     PERFIL_GIPE = 0        # ajuste para o código real no Cargo
     PERFIL_PONTO_FOCAL = 1 # ajuste para o código real
     PERFIL_DIRETOR = 3360     # ajuste para o código real
-
     
     is_app_admin = models.BooleanField(
         "Administrador GIPE",
@@ -73,6 +71,18 @@ class User(AbstractUser):
         null=True,
         blank=True,
         help_text="Codigo responsável pela inativação"
+    )
+
+    motivo_inativacao = models.TextField(
+        verbose_name="Motivo Inativação",
+        help_text="Descrição do motivo da inativação do usuário.",
+        blank=True,
+    )
+
+    inativado_via_unidade = models.BooleanField(
+        "Inativado via unidade",
+        default=False,
+        help_text="Indica se o usuário foi inativado através da unidade"
     )
                               
     class Meta:
