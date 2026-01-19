@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 from apps.users.api.serializers.gestao_usuario_serializer import (
     GestaoUsuarioSerializer,
     GestaoUsuarioListaSerializer,
+    GestaoUsuarioRetrieveSerializer,
     format_cpf,
 )
 from apps.unidades.models.unidades import TipoGestaoChoices
@@ -839,3 +840,65 @@ def test_create_erro_core_sso_rollback_transacao(
     count_depois = User.objects.count()
     assert count_depois == count_antes
     assert not User.objects.filter(username="usuario_rollback").exists()
+
+@pytest.mark.django_db
+def test_retrieve_serializer_retorna_is_active(user_comum):
+    serializer = GestaoUsuarioRetrieveSerializer(user_comum)
+    data = serializer.data
+
+    assert data["is_active"] == user_comum.is_active
+
+
+@pytest.mark.django_db
+def test_retrieve_serializer_retorna_codigo_eol_unidade_e_dre(
+    user_comum,
+    escola_sp,
+    dre_sp,
+):
+    escola_sp.dre = dre_sp
+    escola_sp.save()
+
+    user_comum.unidades.clear()
+    user_comum.unidades.add(escola_sp)
+
+    serializer = GestaoUsuarioRetrieveSerializer(user_comum)
+    data = serializer.data
+
+    assert data["codigo_eol_unidade"] == escola_sp.codigo_eol
+    assert data["codigo_eol_dre_da_unidade"] == escola_sp.dre_id
+
+
+@pytest.mark.django_db
+def test_retrieve_serializer_retorna_unidade_sem_dre(
+    user_comum,
+    escola_sp,
+):
+    """
+    Usuário com unidade associada, mas sem DRE.
+    """
+    escola_sp.dre = None
+    escola_sp.save()
+
+    user_comum.unidades.add(escola_sp)
+
+    serializer = GestaoUsuarioRetrieveSerializer(user_comum)
+    data = serializer.data
+
+    assert data["codigo_eol_unidade"] == escola_sp.codigo_eol
+    assert data["codigo_eol_dre_da_unidade"] is None
+
+
+@pytest.mark.django_db
+def test_retrieve_serializer_retorna_none_quando_usuario_sem_unidade(cargo_comum):
+    user = User.objects.create_user(
+        username="sem_unidade",
+        cpf="12345678901",
+        cargo=cargo_comum,
+    )
+
+    serializer = GestaoUsuarioRetrieveSerializer(user)
+    data = serializer.data
+
+    assert data["codigo_eol_unidade"] is None
+    assert data["codigo_eol_dre_da_unidade"] is None
+

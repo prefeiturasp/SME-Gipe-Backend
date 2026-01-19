@@ -66,6 +66,12 @@ class Unidade(ModeloBase, TemNome):
         blank=True,
         default=''
     )
+    
+    ativa = models.BooleanField(
+        "Ativa",
+        default=True,
+        help_text="Indica se a unidade está ativa ou inativa."
+    )
 
     # Managers
     objects = models.Manager()

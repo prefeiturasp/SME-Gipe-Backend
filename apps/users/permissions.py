@@ -109,4 +109,3 @@ class CanApproveUser(BasePermission):
             return bool(user_dres & obj_dres)
 
         return False
-

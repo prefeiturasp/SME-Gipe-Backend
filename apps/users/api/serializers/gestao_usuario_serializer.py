@@ -27,6 +27,7 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
 
     perfil = serializers.CharField(source="cargo.nome", read_only=True)
     nome = serializers.CharField(source="name", read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
     data_solicitacao = serializers.DateTimeField(
         source="date_joined",
         format="%d/%m/%Y",
@@ -50,7 +51,8 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
             "rede",               
             "diretoria_regional",
             "unidade_educacional",
-            "is_validado",        
+            "is_validado",
+            "is_active",
         ]
 
 
@@ -265,3 +267,44 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             instance.unidades.set(unidades)
 
         return instance
+    
+
+class GestaoUsuarioRetrieveSerializer(GestaoUsuarioSerializer):
+    """
+    Serializer para exibir detalhes completos do usuário.
+    """
+    is_active = serializers.BooleanField(read_only=True)
+    codigo_eol_unidade = serializers.SerializerMethodField()
+    codigo_eol_dre_da_unidade = serializers.SerializerMethodField()
+
+    class Meta(GestaoUsuarioSerializer.Meta):
+        fields = GestaoUsuarioSerializer.Meta.fields + [
+            "is_active",
+            "codigo_eol_unidade",
+            "codigo_eol_dre_da_unidade",
+        ]
+
+    def get_codigo_eol_unidade(self, obj):
+        primeira_unidade = obj.unidades.first()
+
+        if not primeira_unidade:
+            return None
+
+        if primeira_unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+            return None
+
+        return primeira_unidade.codigo_eol
+
+    def get_codigo_eol_dre_da_unidade(self, obj):
+        primeira_unidade = obj.unidades.first()
+
+        if not primeira_unidade:
+            return None
+
+        if primeira_unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+            return primeira_unidade.codigo_eol
+
+        if primeira_unidade.dre:
+            return primeira_unidade.dre.codigo_eol
+
+        return None
