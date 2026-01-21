@@ -10,6 +10,8 @@ from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError, DatabaseError
 
 from apps.users.models import Cargo
+from apps.unidades.models.unidades import Unidade
+from apps.helpers.enums import Cargo as CargoEnum
 from apps.users.services.cargos_service import CargosService
 from apps.users.services.login_service import AutenticacaoService
 from apps.users.api.serializers.login_serializer import LoginSerializer
@@ -123,6 +125,46 @@ class LoginView(TokenObtainPairView):
             logger.warning("Usuário com RF %s não encontrado no model User", rf)
 
         return None
+    
+    def validar_ou_vincular_unidade(self, data: dict, user) -> None:
+        logger.info("Iniciando validação de unidade para o usuário %s", user)
+
+        if user.cargo.codigo not in (CargoEnum.DIRETOR_ESCOLA.value, CargoEnum.ASSISTENTE_DIRECAO.value):
+            logger.info("Usuário ignorado: cargo não é elegível para vínculo automático")
+            return
+        
+        logger.info("Usuário possui cargo elegível para vínculo automático")
+
+        if user.unidades.exists():
+            logger.info("Usuário já possui unidade vinculada. Nenhuma ação necessária.")
+            return
+
+        logger.info("Usuário não possui unidade vinculada. Buscando no CoreSSO.")
+
+        codigo_unidade = None
+        unidades_lotacao = data.get("unidadesLotacao")
+
+        if isinstance(unidades_lotacao, list) and len(unidades_lotacao) > 0:
+            unidade_core = unidades_lotacao[0]
+            codigo_unidade = unidade_core.get("codigo")
+
+        elif data.get("unidadeExercicio"):
+            codigo_unidade = data["unidadeExercicio"].get("codigo")
+
+        if not codigo_unidade:
+            logger.info("Código de unidade inválido ou ausente para usuário. Vínculo não realizado.")
+            return
+
+        logger.info("Buscando unidade na base local para usuário com codigo=%s", codigo_unidade)
+
+        unidade = Unidade.objects.filter(codigo_eol=codigo_unidade).first()
+        if not unidade:
+            logger.info("Unidade não encontrada na base local. Nenhum vínculo realizado para usuário.")
+            return
+        
+        user.unidades.set([unidade])
+
+        logger.info("Usuário vinculado à unidade com sucesso!")
 
     def create_or_update_user_with_cargo(self, login: str, senha: str, auth_data: dict, cargo_autorizado: dict) -> dict:
         """
@@ -160,6 +202,8 @@ class LoginView(TokenObtainPairView):
                     username=login,
                     defaults=dict_user
                 )
+
+                self.validar_ou_vincular_unidade(auth_data, user)
 
                 return user
 
