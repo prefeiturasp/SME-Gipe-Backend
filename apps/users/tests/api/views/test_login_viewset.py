@@ -7,6 +7,8 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APIClient
 
 from apps.users.models import User, Cargo
+from apps.unidades.models.unidades import Unidade
+from apps.helpers.enums import Cargo as CargoEnum
 from apps.constants import LOGIN_PASS_FIELD
 from apps.users.api.views.login_viewset import LoginView
 from apps.helpers.exceptions import AuthenticationError, SmeIntegracaoException
@@ -436,3 +438,98 @@ class TestCargoAlternativo:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.data["detail"] == "Usuário e/ou senha inválida"
+
+
+class TestValidarOuVincularUnidade:
+
+    @pytest.mark.django_db
+    def test_usuario_nao_elegivel(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(nome="Professor", codigo=999)
+        user.save()
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade({}, user)
+
+        assert user.unidades.count() == 0
+
+    @pytest.mark.django_db
+    def test_usuario_ja_possui_unidade(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(nome="Diretor de Escola", codigo=CargoEnum.DIRETOR_ESCOLA.value)
+        unidade = Unidade.objects.create(nome="Escola Teste", codigo_eol=123)
+        user.unidades.set([unidade])
+        user.save()
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade({}, user)
+
+        assert user.unidades.count() == 1
+
+    @pytest.mark.django_db
+    def test_codigo_unidade_invalido(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(nome="Diretor de Escola", codigo=CargoEnum.DIRETOR_ESCOLA.value)
+        user.save()
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade({}, user)
+
+        assert user.unidades.count() == 0
+
+    @pytest.mark.django_db
+    def test_unidade_nao_encontrada_no_banco(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(nome="Diretor de Escola", codigo=CargoEnum.DIRETOR_ESCOLA.value)
+        user.save()
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade({"unidadeExercicio": {"codigo": 9999}}, user)
+
+        assert user.unidades.count() == 0
+
+    @pytest.mark.django_db
+    def test_vincular_unidade_com_sucesso(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(
+            nome="Diretor de Escola",
+            codigo=CargoEnum.DIRETOR_ESCOLA.value
+        )
+        user.save()
+
+        unidade = Unidade.objects.create(
+            nome="Escola Teste",
+            codigo_eol=123
+        )
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade(
+            {"unidadeExercicio": {"codigo": 123}}, user
+        )
+
+        assert user.unidades.count() == 1
+        assert user.unidades.first().nome == unidade.nome
+        assert int(user.unidades.first().codigo_eol) == unidade.codigo_eol
+
+    @pytest.mark.django_db
+    def test_vincular_unidade_com_unidades_lotacao(self, authenticated_client):
+        _, user, _ = authenticated_client()
+        user.cargo = Cargo.objects.create(
+            nome="Diretor de Escola",
+            codigo=CargoEnum.DIRETOR_ESCOLA.value
+        )
+        user.save()
+
+        unidade = Unidade.objects.create(
+            nome="Escola Lotacao",
+            codigo_eol=456
+        )
+
+        view = LoginView()
+        view.validar_ou_vincular_unidade(
+            {"unidadesLotacao": [{"codigo": 456, "nome": "Escola Lotacao"}]}, user
+        )
+
+        assert user.unidades.count() == 1
+        assert user.unidades.first().nome == unidade.nome
+        assert int(user.unidades.first().codigo_eol) == unidade.codigo_eol
