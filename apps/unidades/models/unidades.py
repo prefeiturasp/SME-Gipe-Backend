@@ -93,6 +93,26 @@ class Unidade(ModeloBase, TemNome):
         blank=True,
     )
 
+    data_reativacao = models.DateTimeField(
+        "Data da reativacao",
+        null=True,
+        blank=True,
+        help_text="Data e hora que a unidade foi reativada"
+    )
+
+    responsavel_reativacao = models.CharField(
+        "Responsável pela Reativação",
+        max_length=11,
+        blank=True,
+        help_text="Codigo do responsável pela reativacao"
+    )
+
+    motivo_reativacao = models.TextField(
+        verbose_name="Motivo Reativação",
+        help_text="Descrição do motivo da reativação da unidade.",
+        blank=True,
+    )
+
     # Managers
     objects = models.Manager()
     dres = DresManager()
