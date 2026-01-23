@@ -209,3 +209,97 @@ class TestReativarUnidadeService:
         escola_sp.refresh_from_db()
 
         assert escola_sp.data_reativacao is not None
+
+    @patch("apps.unidades.services.gestao_unidade_service.EnviaEmailService.enviar")
+    @patch("apps.unidades.services.gestao_unidade_service.ReativarUsuarioService.reativar")
+    def test_reativa_usuarios_e_envia_email(
+        self,
+        mock_reativar_usuario,
+        mock_envia_email,
+        escola_sp,
+        user_gipe_admin,
+        django_user_model,
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        usuario1 = django_user_model.objects.create(
+            username="u1",
+            email="u1@test.com",
+            is_active=False,
+            inativado_via_unidade=True,
+            cpf=str(secrets.randbelow(10**11)).zfill(11),
+            name="Usuário 1",
+        )
+        usuario1.unidades.add(escola_sp)
+
+        usuario2 = django_user_model.objects.create(
+            username="u2",
+            email="u2@test.com",
+            is_active=False,
+            inativado_via_unidade=True,
+            cpf=str(secrets.randbelow(10**11)).zfill(11),
+            name="Usuário 2",
+        )
+        usuario2.unidades.add(escola_sp)
+
+        service = ReativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_reativacao="Reabertura",
+        )
+
+        service.executar()
+
+        assert mock_reativar_usuario.call_count == 2
+        mock_reativar_usuario.assert_any_call(usuario_a_ser_reativado=usuario1)
+        mock_reativar_usuario.assert_any_call(usuario_a_ser_reativado=usuario2)
+
+        assert mock_envia_email.call_count == 2
+        mock_envia_email.assert_any_call(
+            destinatario="u1@test.com",
+            assunto="Reativação de perfil no GIPE",
+            template_html="emails/reativacao_unidade.html",
+            contexto={
+                "nome_usuario": "Usuário 1",
+                "motivo_reativacao": "Reabertura",
+                "nome_ue": escola_sp.nome,
+            },
+        )
+    
+    @patch("apps.unidades.services.gestao_unidade_service.ReativarUsuarioService.reativar")
+    def test_transaction_rollback_se_falhar_reativacao_usuario(
+        self,
+        mock_reativar_usuario,
+        escola_sp,
+        user_gipe_admin,
+        django_user_model,
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        usuario = django_user_model.objects.create(
+            username="u1",
+            email="u1@test.com",
+            is_active=False,
+            inativado_via_unidade=True,
+            cpf=str(secrets.randbelow(10**11)).zfill(11),
+            name="Usuário 1",
+        )
+        usuario.unidades.add(escola_sp)
+
+        mock_reativar_usuario.side_effect = Exception("Erro qualquer")
+
+        service = ReativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_reativacao="Teste",
+        )
+
+        with pytest.raises(Exception):
+            service.executar()
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
