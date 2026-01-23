@@ -545,93 +545,6 @@ class TestGestaoUnidadeViewSetDelete:
 
 
 @pytest.mark.django_db
-class TestGestaoUnidadeViewSetAtivar:
-    """Testes para a action ativar."""
-
-    def test_ativar_unidade_gipe_admin(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """GIPE admin pode ativar unidade."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade ativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-    def test_ativar_unidade_ponto_focal_sua_dre(
-        self, api_client, user_pf_admin, escola_sp
-    ):
-        """Ponto Focal pode ativar unidades da sua DRE."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade ativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-    def test_ativar_unidade_ponto_focal_outra_dre(
-        self, api_client, user_pf_admin, escola_outra
-    ):
-        """Ponto Focal não pode ativar unidades de outra DRE."""
-        escola_outra.ativa = False
-        escola_outra.save()
-
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_outra.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        escola_outra.refresh_from_db()
-        assert escola_outra.ativa is False
-
-    def test_ativar_unidade_usuario_comum_negado(
-        self, api_client, user_comum, escola_sp
-    ):
-        """Usuário comum não pode ativar unidade."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_comum)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
-
-    def test_ativar_unidade_ja_ativa(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """Ativar uma unidade já ativa não causa erro."""
-        escola_sp.ativa = True
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-
-@pytest.mark.django_db
 class TestGestaoUnidadeViewSetInativar:
     """Testes para a action inativar."""
 
@@ -714,5 +627,92 @@ class TestGestaoUnidadeViewSetInativar:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == "Unidade e usuários inativados com sucesso."
+
+        mock_executar.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestGestaoUnidadeViewSetReativar:
+    """Testes para a action reativar."""
+
+    def test_reativar_unidade_ponto_focal_outra_dre(
+        self, api_client, user_pf_admin, escola_outra
+    ):
+        """Ponto Focal não pode reativar unidades de outra DRE."""
+        escola_outra.ativa = False
+        escola_outra.save()
+
+        api_client.force_authenticate(user=user_pf_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_outra.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        escola_outra.refresh_from_db()
+        assert escola_outra.ativa is False
+
+    def test_reativar_unidade_usuario_comum_negado(
+        self, api_client, user_comum, escola_sp
+    ):
+        """Usuário comum não pode reativar unidade."""
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_comum)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+
+    def test_reativar_unidade_inexistente(
+        self, api_client, user_gipe_admin
+    ):
+        """Retorna 400 ao tentar reativar unidade inexistente."""
+        import uuid
+        fake_uuid = uuid.uuid4()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": fake_uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_reativar_sem_motivo_retorna_400(
+        self, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "motivo" in response.data["detail"].lower()
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+
+    @patch("apps.unidades.services.gestao_unidade_service.ReativarUnidadeService.executar")
+    def test_reativar_com_sucesso(
+        self, mock_executar, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        mock_executar.return_value = None
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == "Unidade reativada com sucesso."
 
         mock_executar.assert_called_once()

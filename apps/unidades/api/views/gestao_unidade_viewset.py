@@ -11,7 +11,7 @@ from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
     GestaoUnidadeListaSerializer,
 )
-from apps.unidades.services.gestao_unidade_service import InativarUnidadeService
+from apps.unidades.services.gestao_unidade_service import InativarUnidadeService, ReativarUnidadeService
 
 class GestaoUnidadeViewSet(ModelViewSet):
 
@@ -72,15 +72,6 @@ class GestaoUnidadeViewSet(ModelViewSet):
 
         return base_qs
 
-    @action(detail=True, methods=["post"], url_path="ativar")
-    def ativar(self, request, uuid=None):
-        unidade = self.get_object()
-        unidade.ativa = True
-        unidade.save(update_fields=["ativa"])
-        return Response(
-            {"detail": "Unidade ativada com sucesso."}, status=status.HTTP_200_OK
-        )
-
     @action(detail=True, methods=["post"], url_path="inativar")
     def inativar(self, request, uuid=None):
         unidade = self.get_object()
@@ -101,6 +92,29 @@ class GestaoUnidadeViewSet(ModelViewSet):
         return Response(
             {"detail": "Unidade e usuários inativados com sucesso."},
             status=status.HTTP_200_OK
+        )
+    
+    @action(detail=True, methods=["post"], url_path="reativar")
+    def reativar(self, request, uuid=None):
+        unidade = self.get_object()
+
+        motivo_reativacao = request.data.get("motivo_reativacao")
+        if not motivo_reativacao:
+            return Response(
+                {"detail": "O motivo da reativação é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        service = ReativarUnidadeService(
+            unidade=unidade,
+            usuario_responsavel=str(request.user),
+            motivo_reativacao=motivo_reativacao,
+        )
+        service.executar()
+
+        return Response(
+            {"detail": "Unidade reativada com sucesso."},
+            status=status.HTTP_200_OK,
         )
         
     @action(detail=False, methods=['get'], url_path='tipos-unidade')

@@ -65,3 +65,41 @@ class InativarUnidadeService:
                 template_html="emails/inativacao_unidade.html",
                 contexto=contexto_email,
             )
+
+
+class ReativarUnidadeService:
+
+    def __init__(self, *, unidade, usuario_responsavel, motivo_reativacao):
+        self.unidade = unidade
+        self.usuario_responsavel = usuario_responsavel
+        self.motivo_reativacao = motivo_reativacao
+
+    def executar(self):
+        self._validar_rede()
+
+        with transaction.atomic():
+            self._reativar_unidade()
+
+    def _validar_rede(self):
+        if self.unidade.rede != TipoGestaoChoices.INDIRETA:
+            raise ValidationError({"detail": "Somente unidades da rede indireta podem ser reativadas."})
+
+    def _reativar_unidade(self):
+        self.unidade.ativa = True
+        self.unidade.data_reativacao = timezone.now()
+        self.unidade.responsavel_reativacao = self.usuario_responsavel
+        self.unidade.motivo_reativacao = self.motivo_reativacao
+
+        self.unidade.data_inativacao = None
+        self.unidade.responsavel_inativacao = ""
+        self.unidade.motivo_inativacao = ""
+
+        self.unidade.save(update_fields=[
+            "ativa",
+            "data_reativacao",
+            "responsavel_reativacao",
+            "motivo_reativacao",
+            "data_inativacao",
+            "responsavel_inativacao",
+            "motivo_inativacao",
+        ])

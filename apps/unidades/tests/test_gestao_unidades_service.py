@@ -1,11 +1,12 @@
 import pytest
 import secrets
+from django.utils import timezone
 
 from unittest.mock import patch
 from rest_framework.exceptions import ValidationError
 
 from apps.users.models import User
-from apps.unidades.services.gestao_unidade_service import InativarUnidadeService
+from apps.unidades.services.gestao_unidade_service import InativarUnidadeService, ReativarUnidadeService
 
 @pytest.fixture
 def usuario_vinculado_unidade(db, escola_sp):
@@ -130,3 +131,81 @@ class TestInativarUnidadeService:
                 "motivo_inativacao": "Motivo X",
                 "nome_ue": "Escola Teste",
             }
+
+
+@pytest.mark.django_db
+class TestReativarUnidadeService:
+    """Testes do service ReativarUnidadeService."""
+
+    def test_nao_permite_reativar_unidade_rede_diferente_indireta(
+        self, escola_sp, user_gipe_admin
+    ):
+        escola_sp.rede = "DIRETA"
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        service = ReativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_reativacao="Teste",
+        )
+
+        with pytest.raises(ValidationError) as exc:
+            service.executar()
+
+        assert str(exc.value.detail["detail"]) == (
+            "Somente unidades da rede indireta podem ser reativadas."
+        )
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+        assert escola_sp.motivo_reativacao in ("", None)
+
+    def test_reativa_unidade_rede_indireta_e_limpa_campos_inativacao(
+        self, escola_sp, user_gipe_admin
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = False
+
+        escola_sp.data_inativacao = timezone.now()
+        escola_sp.responsavel_inativacao = "Fulano"
+        escola_sp.motivo_inativacao = "Encerramento"
+        escola_sp.save()
+
+        service = ReativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_reativacao="Reabertura",
+        )
+
+        service.executar()
+
+        escola_sp.refresh_from_db()
+
+        assert escola_sp.ativa is True
+        assert escola_sp.motivo_reativacao == "Reabertura"
+        assert escola_sp.responsavel_reativacao == str(user_gipe_admin)
+        assert escola_sp.data_reativacao is not None
+
+        assert escola_sp.data_inativacao is None
+        assert escola_sp.responsavel_inativacao == ""
+        assert escola_sp.motivo_inativacao == ""
+
+    def test_data_reativacao_e_preenchida(
+        self, escola_sp, user_gipe_admin
+    ):
+        escola_sp.rede = "INDIRETA"
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        service = ReativarUnidadeService(
+            unidade=escola_sp,
+            usuario_responsavel=str(user_gipe_admin),
+            motivo_reativacao="Teste",
+        )
+
+        service.executar()
+
+        escola_sp.refresh_from_db()
+
+        assert escola_sp.data_reativacao is not None
