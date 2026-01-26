@@ -46,6 +46,9 @@ class InativarUnidadeService:
 
     def _inativar_usuarios(self, usuarios):
         for usuario in usuarios:
+            if not usuario.is_active:
+                continue
+
             InativarUsuarioService.inativar(
                 usuario,
                 self.usuario_responsavel,
