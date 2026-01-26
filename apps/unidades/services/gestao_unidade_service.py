@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.users.models import User
 from apps.users.services.envia_email_service import EnviaEmailService
-from apps.users.services.gestao_usuario_service import InativarUsuarioService
+from apps.users.services.gestao_usuario_service import InativarUsuarioService, ReativarUsuarioService
 from apps.unidades.models.unidades import TipoGestaoChoices
 
 
@@ -46,6 +46,9 @@ class InativarUnidadeService:
 
     def _inativar_usuarios(self, usuarios):
         for usuario in usuarios:
+            if not usuario.is_active:
+                continue
+
             InativarUsuarioService.inativar(
                 usuario,
                 self.usuario_responsavel,
@@ -76,13 +79,22 @@ class ReativarUnidadeService:
 
     def executar(self):
         self._validar_rede()
+        usuarios = self._obter_usuarios_da_unidade_para_reativar()
 
         with transaction.atomic():
             self._reativar_unidade()
+            self._reativar_usuarios(usuarios)
 
     def _validar_rede(self):
         if self.unidade.rede != TipoGestaoChoices.INDIRETA:
             raise ValidationError({"detail": "Somente unidades da rede indireta podem ser reativadas."})
+    
+    def _obter_usuarios_da_unidade_para_reativar(self):
+        return User.objects.filter(
+            unidades=self.unidade,
+            is_active=False,
+            inativado_via_unidade=True,
+        )
 
     def _reativar_unidade(self):
         self.unidade.ativa = True
@@ -103,3 +115,22 @@ class ReativarUnidadeService:
             "responsavel_inativacao",
             "motivo_inativacao",
         ])
+    
+    def _reativar_usuarios(self, usuarios):
+        for usuario in usuarios:
+            ReativarUsuarioService.reativar(
+                usuario_a_ser_reativado=usuario
+            )
+
+            contexto_email = {
+                "nome_usuario": usuario.name,
+                "motivo_reativacao": self.motivo_reativacao,
+                "nome_ue": self.unidade.nome
+            }
+
+            EnviaEmailService.enviar(
+                destinatario=usuario.email,
+                assunto="Reativação de perfil no GIPE",
+                template_html="emails/reativacao_unidade.html",
+                contexto=contexto_email,
+            )
