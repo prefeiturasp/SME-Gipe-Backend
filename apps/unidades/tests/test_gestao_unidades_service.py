@@ -5,7 +5,8 @@ from django.utils import timezone
 from unittest.mock import patch
 from rest_framework.exceptions import ValidationError
 
-from apps.users.models import User
+from apps.users.models import User, Cargo
+from apps.unidades.models.unidades import Unidade, TipoGestaoChoices
 from apps.unidades.services.gestao_unidade_service import InativarUnidadeService, ReativarUnidadeService
 
 @pytest.fixture
@@ -303,3 +304,54 @@ class TestReativarUnidadeService:
 
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is False
+
+    def test_inativar_unidade_ignora_usuario_ja_inativo(self):
+        unidade = Unidade.objects.create(
+            nome="UE Teste",
+            rede=TipoGestaoChoices.INDIRETA,
+            ativa=True,
+        )
+
+        cargo = Cargo.objects.create(codigo=1234, nome="Cargo Teste")
+
+        usuario_inativo = User.objects.create(
+            username="inativo",
+            cpf="11111111111",
+            name="Usuário Inativo",
+            cargo=cargo,
+            is_active=False,
+            email="teste@teste.com",
+            data_inativacao=timezone.now(),
+        )
+
+        usuario_ativo = User.objects.create(
+            username="ativo",
+            cpf="22222222222",
+            name="Usuário Ativo",
+            cargo=cargo,
+            email="teste@teste.com",
+            is_active=True,
+        )
+
+        usuario_inativo.unidades.add(unidade)
+        usuario_ativo.unidades.add(unidade)
+
+        data_inativacao_inativo = usuario_inativo.data_inativacao
+
+        service = InativarUnidadeService(
+            unidade=unidade,
+            usuario_responsavel="ADMIN",
+            motivo_inativacao="Encerramento"
+        )
+
+        service.executar()
+
+        usuario_inativo.refresh_from_db()
+        usuario_ativo.refresh_from_db()
+        unidade.refresh_from_db()
+
+        assert usuario_inativo.is_active is False
+        assert usuario_inativo.data_inativacao == data_inativacao_inativo
+        assert usuario_ativo.is_active is False
+        assert usuario_ativo.data_inativacao is not None
+        assert unidade.ativa is False

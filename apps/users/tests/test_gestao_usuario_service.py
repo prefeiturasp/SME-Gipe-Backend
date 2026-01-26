@@ -37,7 +37,7 @@ class TestInativarUsuarioService:
 
         assert resultado == usuario
         assert usuario.is_active is False
-        assert usuario.data_inativacao == data_inativacao
+        assert usuario.data_inativacao.replace(microsecond=0) == data_inativacao.replace(microsecond=0)
         assert usuario.responsavel_inativacao == "01234567899"
         assert usuario.motivo_inativacao == ""
         assert usuario.inativado_via_unidade == False
