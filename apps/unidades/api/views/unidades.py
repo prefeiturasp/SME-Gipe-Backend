@@ -8,9 +8,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import AllowAny, IsAuthenticated
- 
+
 from apps.unidades.api.serializers.unidades import UnidadeSerializer
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
+from apps.unidades.services.consulta_unidade_eol_service import ConsultaDadosEolService
  
 logger = logging.getLogger(__name__)
  
@@ -150,3 +151,56 @@ class UnidadeViewSet(ModelViewSet):
         }
 
         return Response(resposta)
+
+    @action(detail=True, methods=["get"], url_path="consultar-eol")
+    def consultar_eol(self, request, pk=None):
+        user = request.user
+
+        try:
+            unidade_eol = ConsultaDadosEolService.consultar_dados_unidade(pk)
+
+            is_dre = unidade_eol["codigo"] == unidade_eol["codigoDRE"]
+            dre_da_unidade = unidade_eol["codigoDRE"]
+            dre_do_usuario = user.unidades.values_list('codigo_eol', flat=True).first()
+
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not user.is_gipe and not user.is_ponto_focal:
+            return Response(
+                {"detail": "Usuário sem permissão para realizar esta ação."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if user.is_ponto_focal:
+            if is_dre:
+                return Response(
+                    {"detail": "Ponto focal não pode cadastrar DRE."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if dre_da_unidade != dre_do_usuario:
+                return Response(
+                    {"detail": "A unidade não pertence à sua DRE."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        if is_dre:
+            return Response(
+                {
+                    "etapa_modalidade": "DRE",
+                    "nome_unidade": unidade_eol.get("nomeDRE", ""),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "etapa_modalidade": unidade_eol["siglaTipoEscola"].strip() if unidade_eol.get("siglaTipoEscola") else "",
+                "nome_unidade": unidade_eol.get("nomeExibicao"),
+            },
+            status=status.HTTP_200_OK,
+        )
