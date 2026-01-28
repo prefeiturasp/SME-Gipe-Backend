@@ -881,3 +881,54 @@ def test_list_admin_nao_ve_superusuarios(
     usernames = [u["username"] for u in response.data]
 
     assert "superuser" not in usernames
+
+@pytest.mark.django_db
+def test_consultar_core_sso_rf_valido_retorna_200(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    mock_retorno = {
+        "login": "123456",
+        "nome": "teste usuario",
+        "email": "usuario@teste.com",
+    }
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        return_value=mock_retorno,
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=123456"
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data == mock_retorno
+
+@pytest.mark.django_db
+def test_consultar_core_sso_rf_invalido_retorna_404(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        return_value=None,
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=000000"
+        )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["detail"] == "RF inválido!"
+
+@pytest.mark.django_db
+def test_consultar_core_sso_erro_inesperado_retorna_400(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        side_effect=Exception("Falha na integração"),
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=123456"
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Falha na integração"
