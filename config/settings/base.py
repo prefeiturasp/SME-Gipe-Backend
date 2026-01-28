@@ -16,6 +16,17 @@ READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=False)
 if READ_DOT_ENV_FILE:
     # OS environment variables take precedence over variables from .env
     env.read_env(str(BASE_DIR / ".env"))
+    
+    
+INTERCORRENCIAS_API_URL = env(
+    'INTERCORRENCIAS_API_URL',
+    default='http://localhost:7000/api-intercorrencias/v1'
+)    
+
+INTERNAL_SERVICE_TOKEN = env(
+    'INTERNAL_SERVICE_TOKEN',
+    default='sua_chave_interna_aqui'
+)
 
 # GENERAL
 # ------------------------------------------------------------------------------
