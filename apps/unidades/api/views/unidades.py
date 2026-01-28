@@ -172,20 +172,20 @@ class UnidadeViewSet(ModelViewSet):
         if not user.is_gipe and not user.is_ponto_focal:
             return Response(
                 {"detail": "Usuário sem permissão para realizar esta ação."},
-                status=status.HTTP_404_NOT_FOUND,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if user.is_ponto_focal:
             if is_dre:
                 return Response(
                     {"detail": "Ponto focal não pode cadastrar DRE."},
-                    status=status.HTTP_404_NOT_FOUND,
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if dre_da_unidade != dre_do_usuario:
                 return Response(
                     {"detail": "A unidade não pertence à sua DRE."},
-                    status=status.HTTP_404_NOT_FOUND,
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         if is_dre:

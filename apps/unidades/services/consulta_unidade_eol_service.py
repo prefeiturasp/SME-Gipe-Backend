@@ -49,7 +49,6 @@ class ConsultaDadosEolService:
                 )
 
             response_data = response.json()
-            print('response_data: ', response_data)
 
             campos_chave = ["codigo", "nome", "codigoDRE"]
             if not any(response_data.get(campo) not in (None, 0) for campo in campos_chave):
@@ -57,7 +56,7 @@ class ConsultaDadosEolService:
                     "Payload vazio retornado. Escola não encontrada. Código EOL: %s",
                     codigo_escola_eol
                 )
-                raise SmeIntegracaoException("Códico EOL inválido!")
+                raise SmeIntegracaoException("Código EOL inválido!")
 
             logger.info(
                 "Dados da escola consultados com sucesso. Código EOL: %s",
