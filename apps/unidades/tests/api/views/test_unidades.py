@@ -346,7 +346,7 @@ class TestUnidadeViewSetConsultarEOL:
 
         response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Usuário sem permissão" in response.data["detail"]
 
     @patch(PATCH_PATH)
@@ -363,7 +363,7 @@ class TestUnidadeViewSetConsultarEOL:
 
         response = api_client.get(f"/api/unidades/{dre.pk}/consultar-eol/")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
 
     @patch(PATCH_PATH)
@@ -379,7 +379,7 @@ class TestUnidadeViewSetConsultarEOL:
 
         response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "A unidade não pertence à sua DRE" in response.data["detail"]
 
     @patch(PATCH_PATH)

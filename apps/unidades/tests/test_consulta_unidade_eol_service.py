@@ -16,7 +16,7 @@ class TestConsultaDadosEolService:
         self, mock_get, mock_env
     ):
         mock_env.return_value = self.BASE_URL
-
+ 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -74,7 +74,7 @@ class TestConsultaDadosEolService:
         with pytest.raises(SmeIntegracaoException) as exc:
             ConsultaDadosEolService.consultar_dados_unidade("000000")
 
-        assert "Códico EOL inválido" in str(exc.value)
+        assert "Código EOL inválido" in str(exc.value)
 
     @patch("apps.unidades.services.consulta_unidade_eol_service.env")
     @patch("apps.unidades.services.consulta_unidade_eol_service.requests.get")
