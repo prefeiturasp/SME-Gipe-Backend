@@ -1,6 +1,7 @@
 import secrets
 import pytest
 import uuid as uuid_lib
+from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -111,6 +112,22 @@ def dre_inativa():
         rede=TipoGestaoChoices.INDIRETA,
         ativa=False,
     )
+
+
+@pytest.fixture
+def usuario_gipe(usuario):
+    usuario.is_gipe = True
+    usuario.is_ponto_focal = False
+    usuario.save()
+    return usuario
+
+
+@pytest.fixture
+def usuario_ponto_focal(usuario):
+    usuario.is_gipe = False
+    usuario.is_ponto_focal = True
+    usuario.save()
+    return usuario
 
 
 @pytest.mark.django_db
@@ -246,3 +263,134 @@ class TestUnidadeViewSet:
         assert "UE Indireta" in nomes
         assert "DRE Inativa" not in nomes
         assert "UE Indireta Inativa" not in nomes
+    
+PATCH_PATH = (
+    "apps.unidades.api.views.unidades."
+    "ConsultaDadosEolService.consultar_dados_unidade"
+)
+
+@pytest.mark.django_db
+class TestUnidadeViewSetConsultarEOL:
+
+    @pytest.fixture
+    def cargo_gipe(self, db):
+        from apps.users.models import Cargo, User
+        return Cargo.objects.create(codigo=User.PERFIL_GIPE, nome="GIPE")
+
+    @pytest.fixture
+    def cargo_ponto_focal(self, db):
+        from apps.users.models import Cargo, User
+        return Cargo.objects.create(
+            codigo=User.PERFIL_PONTO_FOCAL, nome="Ponto Focal"
+        )
+
+    @pytest.fixture
+    def usuario_gipe(self, usuario, cargo_gipe):
+        usuario.cargo = cargo_gipe
+        usuario.save()
+        return usuario
+
+    @pytest.fixture
+    def usuario_ponto_focal(self, usuario, cargo_ponto_focal):
+        usuario.cargo = cargo_ponto_focal
+        usuario.save()
+        return usuario
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_sucesso_gipe(
+        self, mock_consulta, api_client, usuario_gipe, dre
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Teste",
+        }
+
+        response = api_client.get(f"/api/unidades/{dre.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "DRE"
+        assert response.data["nome_unidade"] == "DRE Teste"
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_ue_sucesso(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+            "siglaTipoEscola": "CEI ",
+            "nomeExibicao": "UE Indireta",
+        }
+
+        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "CEI"
+        assert response.data["nome_unidade"] == "UE Indireta"
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_usuario_sem_permissao(
+        self, mock_consulta, api_client, usuario, ue_indireta
+    ):
+        api_client.force_authenticate(usuario)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Usuário sem permissão" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_ponto_focal_nao_pode_cadastrar_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal, dre
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Teste",
+        }
+
+        response = api_client.get(f"/api/unidades/{dre.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_ponto_focal_ue_fora_da_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "999999",
+        }
+
+        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "A unidade não pertence à sua DRE" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_servico_erro(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.side_effect = Exception("Erro no EOL")
+
+        response = api_client.get(f"/api/unidades/{ue_indireta.pk}/consultar-eol/")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["detail"] == "Erro no EOL"
