@@ -8,7 +8,7 @@ from apps.helpers.exceptions import InternalError, SmeIntegracaoException
 @pytest.mark.django_db
 class TestConsultaDadosEolService:
 
-    BASE_URL = "http://sme-integracao"
+    BASE_URL = "https://sme-integracao"
 
     @patch("apps.unidades.services.consulta_unidade_eol_service.env")
     @patch("apps.unidades.services.consulta_unidade_eol_service.requests.get")
