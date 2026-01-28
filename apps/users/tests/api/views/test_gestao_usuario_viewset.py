@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 
 from apps.unidades.models.unidades import TipoGestaoChoices
+from apps.helpers.exceptions import IntercorrenciasDeletionError
 
 User = get_user_model()
 
@@ -643,6 +644,77 @@ def test_inativar_usuario_sem_motivo_inativacao_retorna_400(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["detail"] == "Motivo inativação é obrigatória para executar a inativação."
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_falha_intercorrencias_retorna_400(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Falha ao deletar intercorrencias retorna 400."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar",
+        side_effect=IntercorrenciasDeletionError("erro intercorrencias"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Não foi possível inativar o usuário" in response.data["detail"]
+    assert response.data["motivo"] == "Falha ao deletar intercorrências em preenchimento."
+    assert response.data["erro_tecnico"] == "erro intercorrencias"
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_erro_inesperado_retorna_500(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Erro inesperado ao inativar usuario retorna 500."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar",
+        side_effect=Exception("boom"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.data["detail"] == "Erro inesperado ao inativar usuário."
+    assert response.data["erro_tecnico"] == "boom"
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_falha_envio_email_retorna_200(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Falha no envio de email nao reverte inativacao."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar"
+    ), patch(
+        "apps.users.api.views.gestao_usuario_viewset.EnviaEmailService.enviar",
+        side_effect=Exception("email falhou"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["detail"] == "Usuário inativado com sucesso."
 
 
 @pytest.mark.django_db
