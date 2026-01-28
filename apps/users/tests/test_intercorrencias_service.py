@@ -6,7 +6,7 @@ from apps.users.services.intercorrencias_service import IntercorrenciasService
 
 
 class TestIntercorrenciasService:
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch("apps.users.services.intercorrencias_service.requests.post")
     def test_deletar_intercorrencias_usuario_inativo_sucesso(self, mock_post):
@@ -24,7 +24,7 @@ class TestIntercorrenciasService:
         assert resultado["error"] is None
         assert resultado["error_type"] is None
         mock_post.assert_called_once_with(
-            "http://intercorrencias/diretor/deletar-por-usuario-inativo/",
+            "https://intercorrencias/diretor/deletar-por-usuario-inativo/",
             json={"username": "usuario_teste"},
             headers={
                 "Content-Type": "application/json",
@@ -33,7 +33,7 @@ class TestIntercorrenciasService:
             timeout=IntercorrenciasService.TIMEOUT,
         )
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch("apps.users.services.intercorrencias_service.requests.post", side_effect=requests.exceptions.Timeout)
     def test_deletar_intercorrencias_usuario_inativo_timeout(self, _mock_post):
@@ -46,7 +46,7 @@ class TestIntercorrenciasService:
         assert resultado["error_type"] == "TIMEOUT"
         assert "Timeout" in resultado["error"]
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch(
         "apps.users.services.intercorrencias_service.requests.post",
@@ -62,7 +62,7 @@ class TestIntercorrenciasService:
         assert resultado["error_type"] == "CONNECTION_ERROR"
         assert "Falha ao conectar" in resultado["error"]
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch("apps.users.services.intercorrencias_service.requests.post")
     def test_deletar_intercorrencias_usuario_inativo_http_error(self, mock_post):
@@ -81,7 +81,7 @@ class TestIntercorrenciasService:
         assert resultado["error_type"] == "HTTP_500"
         assert "Erro HTTP 500" in resultado["error"]
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch("apps.users.services.intercorrencias_service.requests.post")
     def test_deletar_intercorrencias_usuario_inativo_http_error_sem_json(self, mock_post):
@@ -106,7 +106,7 @@ class TestIntercorrenciasService:
         assert resultado["error_type"] == "HTTP_500"
         assert "falhou" in resultado["error"]
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch(
         "apps.users.services.intercorrencias_service.requests.post",
@@ -121,7 +121,7 @@ class TestIntercorrenciasService:
         assert resultado["data"] is None
         assert resultado["error_type"] == "REQUEST_ERROR"
 
-    @patch.object(IntercorrenciasService, "BASE_URL", "http://intercorrencias")
+    @patch.object(IntercorrenciasService, "BASE_URL", "https://intercorrencias")
     @patch.object(IntercorrenciasService, "INTERNAL_TOKEN", "internal-token")
     @patch("apps.users.services.intercorrencias_service.requests.post", side_effect=Exception("boom"))
     def test_deletar_intercorrencias_usuario_inativo_erro_inesperado(self, _mock_post):
