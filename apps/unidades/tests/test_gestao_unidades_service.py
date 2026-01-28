@@ -305,7 +305,8 @@ class TestReativarUnidadeService:
         escola_sp.refresh_from_db()
         assert escola_sp.ativa is False
 
-    def test_inativar_unidade_ignora_usuario_ja_inativo(self):
+    @patch("apps.unidades.services.gestao_unidade_service.InativarUsuarioService.inativar")
+    def test_inativar_unidade_ignora_usuario_ja_inativo(self, mock_inativar_usuario):
         unidade = Unidade.objects.create(
             nome="UE Teste",
             rede=TipoGestaoChoices.INDIRETA,
@@ -338,6 +339,22 @@ class TestReativarUnidadeService:
 
         data_inativacao_inativo = usuario_inativo.data_inativacao
 
+        def _fake_inativar(usuario_a_ser_inativado, usuario_responsavel, motivo_inativacao, flag_via_unidade):
+            usuario_a_ser_inativado.is_active = False
+            usuario_a_ser_inativado.data_inativacao = timezone.now()
+            usuario_a_ser_inativado.responsavel_inativacao = usuario_responsavel
+            usuario_a_ser_inativado.motivo_inativacao = motivo_inativacao
+            usuario_a_ser_inativado.inativado_via_unidade = flag_via_unidade
+            usuario_a_ser_inativado.save(update_fields=[
+                "is_active",
+                "data_inativacao",
+                "responsavel_inativacao",
+                "motivo_inativacao",
+                "inativado_via_unidade",
+            ])
+
+        mock_inativar_usuario.side_effect = _fake_inativar
+
         service = InativarUnidadeService(
             unidade=unidade,
             usuario_responsavel="ADMIN",
@@ -350,6 +367,7 @@ class TestReativarUnidadeService:
         usuario_ativo.refresh_from_db()
         unidade.refresh_from_db()
 
+        assert mock_inativar_usuario.call_count == 1
         assert usuario_inativo.is_active is False
         assert usuario_inativo.data_inativacao == data_inativacao_inativo
         assert usuario_ativo.is_active is False
