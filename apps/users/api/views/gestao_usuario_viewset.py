@@ -19,6 +19,7 @@ from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOServi
 
 from uuid import UUID
 from apps.users.services.gestao_usuario_service import InativarUsuarioService, ReativarUsuarioService
+from apps.users.services.sme_integracao_service import SmeIntegracaoService
 from apps.helpers.exceptions import IntercorrenciasDeletionError
 
 import logging
@@ -343,3 +344,21 @@ class GestaoUsuarioViewSet(ModelViewSet):
             {"detail": "Usuário reativado com sucesso."},
             status=status.HTTP_200_OK
         )
+    
+    @action(detail=False, methods=["get"], permission_classes=[CanApproveUser], url_path="consultar-core-sso")
+    def consultar_core_sso(self, request):
+
+        try:
+            rf = request.query_params.get("rf")
+            user_core_sso = SmeIntegracaoService.usuario_core_sso_or_none(login=rf)
+
+            if user_core_sso:
+                return Response(data=user_core_sso, status=status.HTTP_200_OK)
+            
+            return Response(data={'detail': 'RF inválido!'}, status=status.HTTP_404_NOT_FOUND)
+            
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
