@@ -11,6 +11,7 @@ from apps.unidades.api.serializers.gestao_unidade_serializer import (
     GestaoUnidadeSerializer,
     GestaoUnidadeListaSerializer,
 )
+from apps.unidades.services.consulta_unidade_eol_service import ConsultaDadosEolService
 from apps.unidades.services.gestao_unidade_service import InativarUnidadeService, ReativarUnidadeService
 
 class GestaoUnidadeViewSet(ModelViewSet):
@@ -121,3 +122,61 @@ class GestaoUnidadeViewSet(ModelViewSet):
     def tipos_unidade(self, _):
         tipos = [{"id": choice[0], "label": choice[1]} for choice in TipoUnidadeChoices.choices]
         return Response(tipos, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="consultar-eol")
+    def consultar_eol(self, request):
+        user = request.user
+
+        codigo_eol = request.query_params.get("codigo_eol")
+        try:
+            unidade_eol = ConsultaDadosEolService.consultar_dados_unidade(codigo_eol)
+            codigo_dre_core_sso = unidade_eol["codigoDRE"]
+
+            is_dre = unidade_eol["codigo"] == codigo_dre_core_sso
+            dre_da_unidade = unidade_eol["codigoDRE"]
+            dre_do_usuario = user.unidades.values_list('codigo_eol', flat=True).first()
+
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not user.is_gipe and not user.is_ponto_focal:
+            return Response(
+                {"detail": "Usuário sem permissão para realizar esta ação."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.is_ponto_focal:
+            if is_dre:
+                return Response(
+                    {"detail": "Ponto focal não pode cadastrar DRE."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if dre_da_unidade != dre_do_usuario:
+                return Response(
+                    {"detail": "A unidade não pertence à sua DRE."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+        if user.is_gipe:
+            dre_cadastrada = Unidade.objects.filter(codigo_eol=codigo_dre_core_sso).exists()
+            if not dre_cadastrada:
+                return Response(
+                    {"detail": "Diretoria Regional não encontrada! A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        data = {
+            "etapa_modalidade": unidade_eol.get("siglaTipoEscola", "").strip() if unidade_eol.get("siglaTipoEscola") else "",
+            "nome_unidade": unidade_eol.get("nomeExibicao"),
+            "codigo_dre": unidade_eol.get("codigoDRE", ""),
+        }
+
+        if is_dre:
+            data["etapa_modalidade"] = "DRE"
+            data["nome_unidade"] = unidade_eol.get("nomeDRE", "")
+
+        return Response(data, status=status.HTTP_200_OK)

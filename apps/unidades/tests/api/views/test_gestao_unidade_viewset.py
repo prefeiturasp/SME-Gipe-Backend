@@ -1,9 +1,13 @@
 import pytest
+import secrets
+import uuid as uuid_lib
+
 from unittest.mock import patch, Mock
 from django.urls import reverse
 from rest_framework import status
 
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
+from apps.users.models import Cargo, User
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
 
 @pytest.mark.django_db
@@ -716,3 +720,203 @@ class TestGestaoUnidadeViewSetReativar:
         assert response.data["detail"] == "Unidade reativada com sucesso."
 
         mock_executar.assert_called_once()
+
+PATCH_PATH = (
+    "apps.unidades.api.views.gestao_unidade_viewset."
+    "ConsultaDadosEolService.consultar_dados_unidade"
+)
+
+
+@pytest.fixture
+def user_factory(db):
+    def _create_user(
+        username="testeuser",
+        cpf="12345678901",
+        name="Usuário Teste",
+    ):
+        pwd = secrets.token_urlsafe(16)
+        user = User.objects.create_user(
+            username=username,
+            cpf=cpf,
+            name=name,
+        )
+        user.set_password(pwd)
+        user.save()
+        return user
+
+    return _create_user
+
+@pytest.fixture
+def usuario(user_factory, dre, ue_indireta):
+    user = user_factory()
+    user.unidades.add(ue_indireta)
+    return user
+
+@pytest.fixture
+def dre():
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="111111",
+        nome="DRE Teste",
+        sigla="DRE",
+        tipo_unidade=TipoUnidadeChoices.DRE,
+        rede=TipoGestaoChoices.INDIRETA,
+    )
+
+@pytest.fixture
+def ue_indireta(dre):
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="222222",
+        nome="UE Indireta",
+        sigla="UE",
+        tipo_unidade=TipoUnidadeChoices.CEI,
+        rede=TipoGestaoChoices.INDIRETA,
+        dre=dre,
+    )
+
+@pytest.mark.django_db
+class TestUnidadeViewSetConsultarEOL:
+
+    @pytest.fixture
+    def cargo_gipe(self, db):
+        return Cargo.objects.create(codigo=User.PERFIL_GIPE, nome="GIPE")
+
+    @pytest.fixture
+    def cargo_ponto_focal(self, db):
+        return Cargo.objects.create(
+            codigo=User.PERFIL_PONTO_FOCAL, nome="Ponto Focal"
+        )
+
+    @pytest.fixture
+    def usuario_gipe(self, usuario, cargo_gipe):
+        usuario.cargo = cargo_gipe
+        usuario.save()
+        return usuario
+
+    @pytest.fixture
+    def usuario_ponto_focal(self, usuario, cargo_ponto_focal):
+        usuario.cargo = cargo_ponto_focal
+        usuario.save()
+        return usuario
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_sucesso_gipe(
+        self, mock_consulta, api_client, usuario_gipe, dre
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Teste",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={dre.pk}")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "DRE"
+        assert response.data["nome_unidade"] == "DRE Teste"
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_ue_sucesso(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+            "siglaTipoEscola": "CEI ",
+            "nomeExibicao": "UE Indireta",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "CEI"
+        assert response.data["nome_unidade"] == "UE Indireta"
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_usuario_sem_permissao(
+        self, mock_consulta, api_client, usuario, ue_indireta
+    ):
+        api_client.force_authenticate(usuario)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Usuário sem permissão" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_ponto_focal_nao_pode_cadastrar_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal, dre
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Teste",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={dre.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_ponto_focal_ue_fora_da_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "999999",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "A unidade não pertence à sua DRE" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_servico_erro(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.side_effect = Exception("Erro no EOL")
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["detail"] == "Erro no EOL"
+
+    @patch(PATCH_PATH)
+    def test_gipe_dre_nao_cadastrada_no_sistema(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        Unidade.objects.filter(codigo_eol="999999").delete()
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "999999",
+            "siglaTipoEscola": "CEI ",
+            "nomeExibicao": "UE Indireta",
+        }
+
+        response = api_client.get(
+            f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Diretoria Regional não encontrada!" in response.data["detail"]
