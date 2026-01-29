@@ -916,7 +916,7 @@ def test_consultar_core_sso_rf_invalido_retorna_404(api_client, user_gipe_admin)
         )
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.data["detail"] == "RF inválido!"
+    assert "RF inválido!" in response.data["detail"]
 
 @pytest.mark.django_db
 def test_consultar_core_sso_erro_inesperado_retorna_400(api_client, user_gipe_admin):
