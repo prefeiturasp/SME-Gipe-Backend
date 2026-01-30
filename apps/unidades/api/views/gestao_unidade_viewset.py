@@ -165,7 +165,7 @@ class GestaoUnidadeViewSet(ModelViewSet):
             dre_cadastrada = Unidade.objects.filter(codigo_eol=codigo_dre_core_sso).exists()
             if not dre_cadastrada:
                 return Response(
-                    {"detail": "Diretoria Regional não encontrada! A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."},
+                    {"detail": "A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
