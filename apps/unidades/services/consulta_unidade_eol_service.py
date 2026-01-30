@@ -56,7 +56,7 @@ class ConsultaDadosEolService:
                     "Payload vazio retornado. Escola não encontrada. Código EOL: %s",
                     codigo_escola_eol
                 )
-                raise SmeIntegracaoException("Código EOL inválido! Por favor, verifique se o código está correto e tente novamente.")
+                raise SmeIntegracaoException("Por favor, verifique se o código está correto e tente novamente.")
 
             logger.info(
                 "Dados da escola consultados com sucesso. Código EOL: %s",

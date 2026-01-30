@@ -74,7 +74,7 @@ class TestConsultaDadosEolService:
         with pytest.raises(SmeIntegracaoException) as exc:
             ConsultaDadosEolService.consultar_dados_unidade("000000")
 
-        assert "Código EOL inválido" in str(exc.value)
+        assert str(exc.value) == "Por favor, verifique se o código está correto e tente novamente."
 
     @patch("apps.unidades.services.consulta_unidade_eol_service.env")
     @patch("apps.unidades.services.consulta_unidade_eol_service.requests.get")
