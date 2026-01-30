@@ -139,7 +139,7 @@ class GestaoUnidadeViewSet(ModelViewSet):
         except Exception as e:
             return Response(
                 {"detail": str(e)},
-                status=status.HTTP_404_NOT_FOUND,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if not user.is_gipe and not user.is_ponto_focal:
