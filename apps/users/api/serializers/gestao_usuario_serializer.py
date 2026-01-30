@@ -1,7 +1,9 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from apps.unidades.models.unidades import TipoGestaoChoices, Unidade, TipoUnidadeChoices
+from django.utils import timezone
 from django.db import transaction
+from django.contrib.auth import get_user_model
+
+from rest_framework import serializers
+from apps.unidades.models.unidades import TipoGestaoChoices, Unidade, TipoUnidadeChoices
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
 User = get_user_model()
@@ -142,6 +144,25 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             "is_core_sso",
         ]
 
+    def _validate_ponto_focal_unidades(self, user, unidades):
+        """
+        Valida se as unidades estão dentro do escopo do Ponto Focal.
+        """
+        allowed_dres = set(
+            user.unidades.values_list("codigo_eol", flat=True).distinct()
+        )
+        
+        for unidade in unidades:
+            if unidade.tipo_unidade == TipoUnidadeChoices.DRE:
+                if unidade.codigo_eol not in allowed_dres:
+                    raise serializers.ValidationError(
+                        "Ponto Focal só pode cadastrar usuários para sua própria DRE."
+                    )
+            elif unidade.dre_id not in allowed_dres:
+                raise serializers.ValidationError(
+                    "Ponto Focal só pode cadastrar usuários para unidades de sua DRE."
+                )
+
     def validate_unidades(self, unidades):
         """
         Ponto Focal só pode atribuir unidades da própria DRE.
@@ -162,14 +183,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             )
 
         if user.is_ponto_focal:
-            allowed_dres = set(
-                user.unidades.values_list("codigo_eol", flat=True).distinct()
-            )
-            for u in unidades:
-                if u.dre_id not in allowed_dres:
-                    raise serializers.ValidationError(
-                       "Ponto Focal só pode cadastrar usuários para unidades de sua DRE."
-                    )
+            self._validate_ponto_focal_unidades(user, unidades)
 
         return unidades
 
@@ -179,9 +193,9 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
         """
         request = self.context["request"]
         user = request.user
-        if value and not user.is_gipe:
+        if not user.is_gipe:
             raise serializers.ValidationError(
-                "Somente usuários com perfil GIPE podem atribuir perfil administrador."
+                "Somente usuários com perfil GIPE podem atribuir ou remover perfil administrador."
             )
         return value
     
@@ -276,12 +290,20 @@ class GestaoUsuarioRetrieveSerializer(GestaoUsuarioSerializer):
     is_active = serializers.BooleanField(read_only=True)
     codigo_eol_unidade = serializers.SerializerMethodField()
     codigo_eol_dre_da_unidade = serializers.SerializerMethodField()
+    data_inativacao_formatada = serializers.SerializerMethodField()
+    responsavel_inativacao_nome = serializers.SerializerMethodField()
 
     class Meta(GestaoUsuarioSerializer.Meta):
         fields = GestaoUsuarioSerializer.Meta.fields + [
             "is_active",
             "codigo_eol_unidade",
             "codigo_eol_dre_da_unidade",
+            "data_inativacao",
+            "data_inativacao_formatada",
+            "responsavel_inativacao",
+            "responsavel_inativacao_nome",
+            "motivo_inativacao",
+            "inativado_via_unidade"
         ]
 
     def get_codigo_eol_unidade(self, obj):
@@ -308,3 +330,22 @@ class GestaoUsuarioRetrieveSerializer(GestaoUsuarioSerializer):
             return primeira_unidade.dre.codigo_eol
 
         return None
+    
+    def get_data_inativacao_formatada(self, obj):
+        if not obj.data_inativacao:
+            return None
+
+        data_local = timezone.localtime(obj.data_inativacao)
+        return data_local.strftime("%d/%m/%Y às %H:%Mh.")
+    
+    def get_responsavel_inativacao_nome(self, obj):
+        if not obj.responsavel_inativacao:
+            return None
+
+        try:
+            user = User.objects.only("name").get(
+                username=obj.responsavel_inativacao
+            )
+            return user.name
+        except User.DoesNotExist:
+            return None
