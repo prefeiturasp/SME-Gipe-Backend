@@ -919,4 +919,4 @@ class TestUnidadeViewSetConsultarEOL:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Diretoria Regional não encontrada!" in response.data["detail"]
+        assert response.data["detail"] == "A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."
