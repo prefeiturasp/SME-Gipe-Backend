@@ -3,6 +3,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from apps.unidades.models.unidades import TipoGestaoChoices, Unidade, TipoUnidadeChoices
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
 
@@ -121,13 +122,30 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
 
 
 class GestaoUsuarioSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        required=True,
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="Já existe um usuário cadastrado com este RF."
+            )
+        ]
+    )
+    cpf = serializers.CharField(
+        required=True,
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="Já existe um usuário cadastrado com este CPF."
+            )
+        ]
+    )
     unidades = serializers.PrimaryKeyRelatedField(
         queryset=Unidade.objects.all(),
         many=True
     )
     is_app_admin = serializers.BooleanField(required=False)
     
-
     class Meta:
         model = User
         fields = [

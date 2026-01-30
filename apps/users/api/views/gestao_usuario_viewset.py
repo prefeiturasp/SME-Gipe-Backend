@@ -355,7 +355,7 @@ class GestaoUsuarioViewSet(ModelViewSet):
             if user_core_sso:
                 return Response(data=user_core_sso, status=status.HTTP_200_OK)
             
-            return Response(data={'detail': 'RF inválido! Por favor, verifique se o código está correto e tente novamente.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'detail': 'Por favor, verifique se o código está correto e tente novamente.'}, status=status.HTTP_404_NOT_FOUND)
             
         except Exception as e:
             return Response(
