@@ -904,7 +904,7 @@ def test_consultar_core_sso_rf_valido_retorna_200(api_client, user_gipe_admin):
     assert response.data == mock_retorno
 
 @pytest.mark.django_db
-def test_consultar_core_sso_rf_invalido_retorna_404(api_client, user_gipe_admin):
+def test_consultar_core_sso_rf_invalido_retorna_400(api_client, user_gipe_admin):
     api_client.force_authenticate(user=user_gipe_admin)
 
     with patch(
@@ -915,7 +915,7 @@ def test_consultar_core_sso_rf_invalido_retorna_404(api_client, user_gipe_admin)
             "/api/users/gestao-usuarios/consultar-core-sso/?rf=000000"
         )
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["detail"] == "Por favor, verifique se o código está correto e tente novamente."
 
 @pytest.mark.django_db

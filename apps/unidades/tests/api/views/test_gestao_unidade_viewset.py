@@ -896,7 +896,7 @@ class TestUnidadeViewSetConsultarEOL:
 
         response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["detail"] == "Erro no EOL"
 
     @patch(PATCH_PATH)
