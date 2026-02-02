@@ -20,26 +20,39 @@
                 registro de intercorrências escolares, foi inativado.
             </p>
 
-            <div style="
+            <table style="
                 width: 100%;
-                max-width:550px;
-                border-radius:4px;
-                background:#EEF4FF;
-                display:flex;
-                flex-direction:column;
-                gap:8px;
-                padding:16px;
-                text-align:left;
-                margin-bottom:24px;
+                border-collapse: collapse;
+                max-width: 550px;
+                background: #EEF4FF;
+                border-radius: 4px;
+                margin-bottom: 24px;
             ">
-                <p style="margin:0 0 8px 0; font-size:14px; font-weight:700;">
-                    Motivo da inativação:
-                </p>
-
-                <p style="margin:0; font-size:14px;">
-                    {{ motivo_inativacao }}
-                </p>
-            </div>
+                <thead>
+                    <tr>
+                        <th scope="col" style="
+                            text-align: left;
+                            font-size: 14px;
+                            font-weight: 700;
+                            padding: 16px 16px 8px 16px;
+                            color: #42474A;
+                        ">
+                            Motivo da inativação:
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="
+                            font-size: 14px;
+                            padding: 0 16px 16px 16px;
+                            color: #42474A;
+                        ">
+                            {{ motivo_inativacao }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
             <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 400;">
                 Em caso de dúvidas ou dificuldades de acesso, entre em contato com o gabinete da DRE.

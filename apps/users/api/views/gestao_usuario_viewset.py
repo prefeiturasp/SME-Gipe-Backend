@@ -19,6 +19,12 @@ from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOServi
 
 from uuid import UUID
 from apps.users.services.gestao_usuario_service import InativarUsuarioService, ReativarUsuarioService
+from apps.users.services.sme_integracao_service import SmeIntegracaoService
+from apps.helpers.exceptions import IntercorrenciasDeletionError
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 env = environ.Env()
@@ -245,25 +251,72 @@ class GestaoUsuarioViewSet(ModelViewSet):
                 {"detail": "Motivo inativação é obrigatória para executar a inativação."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+            
+            
+        try:
+            InativarUsuarioService.inativar(
+                usuario_a_ser_inativado=usuario,
+                usuario_responsavel=str(request.user),
+                motivo_inativacao=motivo_inativacao,
+                flag_via_unidade=False
+            )
+            
+            logger.info(
+                f"Usuário {usuario.username} inativado com sucesso "
+                f"por {request.user.username}"
+            )
+        except IntercorrenciasDeletionError as e:
+            error_message = str(e)
+            
+            logger.error(
+                f"Falha ao inativar usuário {usuario.username}: "
+                f"Erro ao deletar intercorrências - {error_message}"
+            )
+            
+            return Response(
+                {
+                    "detail": f"Não foi possível inativar o usuário. {error_message}",
+                    "motivo": "Falha ao deletar intercorrências em preenchimento.",
+                    "erro_tecnico": error_message,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        InativarUsuarioService.inativar(
-            usuario_a_ser_inativado=usuario,
-            usuario_responsavel=str(request.user),
-            motivo_inativacao=motivo_inativacao,
-            flag_via_unidade=False
-        )
+        except Exception as e:
+            # Qualquer outro erro inesperado
+            logger.error(
+                f"Erro inesperado ao inativar usuário {usuario.username}: {str(e)}",
+                exc_info=True
+            )
+            
+            return Response(
+                {
+                    "detail": "Erro inesperado ao inativar usuário.",
+                    "erro_tecnico": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
+        try:
+            contexto_email = {
+                "nome_usuario": usuario.name,
+                "motivo_inativacao": motivo_inativacao,
+            }
 
-        contexto_email = {
-            "nome_usuario": usuario.name,
-            "motivo_inativacao": motivo_inativacao,
-        }
+            EnviaEmailService.enviar(
+                destinatario=usuario.email,
+                assunto="Inativação de perfil no GIPE",
+                template_html="emails/inativacao_usuario.html",
+                contexto=contexto_email,
+            )
+            
+            logger.info(f"Email de inativação enviado para {usuario.email}")
 
-        EnviaEmailService.enviar(
-            destinatario=usuario.email,
-            assunto="Inativação de perfil no GIPE",
-            template_html="emails/inativacao_usuario.html",
-            contexto=contexto_email,
-        )
+        except Exception as e:
+            # Se falhar ao enviar email, apenas loga mas não reverte a inativação
+            logger.warning(
+                f"Falha ao enviar email de inativação para {usuario.email}: {str(e)}"
+            )
 
         return Response(
             {"detail": "Usuário inativado com sucesso."},
@@ -291,3 +344,21 @@ class GestaoUsuarioViewSet(ModelViewSet):
             {"detail": "Usuário reativado com sucesso."},
             status=status.HTTP_200_OK
         )
+    
+    @action(detail=False, methods=["get"], permission_classes=[CanApproveUser], url_path="consultar-core-sso")
+    def consultar_core_sso(self, request):
+
+        try:
+            rf = request.query_params.get("rf")
+            user_core_sso = SmeIntegracaoService.usuario_core_sso_or_none(login=rf)
+
+            if user_core_sso:
+                return Response(data=user_core_sso, status=status.HTTP_200_OK)
+            
+            return Response(data={'detail': 'Por favor, verifique se o código está correto e tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

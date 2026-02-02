@@ -1,6 +1,7 @@
 import secrets
 import pytest
 import uuid as uuid_lib
+from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -111,6 +112,22 @@ def dre_inativa():
         rede=TipoGestaoChoices.INDIRETA,
         ativa=False,
     )
+
+
+@pytest.fixture
+def usuario_gipe(usuario):
+    usuario.is_gipe = True
+    usuario.is_ponto_focal = False
+    usuario.save()
+    return usuario
+
+
+@pytest.fixture
+def usuario_ponto_focal(usuario):
+    usuario.is_gipe = False
+    usuario.is_ponto_focal = True
+    usuario.save()
+    return usuario
 
 
 @pytest.mark.django_db

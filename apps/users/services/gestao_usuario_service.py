@@ -1,6 +1,14 @@
 from django.utils import timezone
 from django.db import transaction
 
+from apps.helpers.exceptions import IntercorrenciasDeletionError
+from apps.users.services.intercorrencias_service import IntercorrenciasService
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class InativarUsuarioService:
 
     @staticmethod
@@ -25,6 +33,29 @@ class InativarUsuarioService:
                     "inativado_via_unidade",
                 ]
             )
+            
+            try:
+                resultado = IntercorrenciasService.deletar_intercorrencias_usuario_inativo(
+                    username=usuario_a_ser_inativado.username
+                )
+            
+                if resultado['success']:
+                    logger.info(
+                        f"Intercorrências do usuário {usuario_a_ser_inativado.username} "
+                        f"deletadas: {resultado['data'].get('intercorrencias_deletadas', 0)}"
+                    )
+                else:
+                    logger.warning(
+                        f"Falha ao deletar intercorrências do usuário "
+                        f"{usuario_a_ser_inativado.username}: {resultado.get('error')}"
+                    )
+                    raise IntercorrenciasDeletionError(resultado.get('error')) 
+                
+            except Exception as e:
+                logger.error(
+                    f"Erro inesperado ao deletar intercorrências: {str(e)}"
+                )
+                raise IntercorrenciasDeletionError(str(e)) 
 
         return usuario_a_ser_inativado
 
