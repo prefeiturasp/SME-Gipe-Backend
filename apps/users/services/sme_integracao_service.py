@@ -112,7 +112,7 @@ class SmeIntegracaoService:
                 str(err),
             )
             raise SmeIntegracaoException(
-                f"Erro ao procurar usuário {login} no CoreSSO."
+                "Não foi possível realizar a consulta. Tente novamente mais tarde."
             ) from err
         
     @classmethod

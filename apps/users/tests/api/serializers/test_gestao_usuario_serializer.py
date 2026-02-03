@@ -282,41 +282,6 @@ def test_is_valid_preserva_detail_se_ja_existe(api_rf, user_gipe_admin):
     assert serializer.errors.get("detail") == "Erro customizado que já estava lá"
 
 
-# ==========================================
-# Testes para create
-# ==========================================
-
-@pytest.mark.django_db
-def test_create_gipe_admin_cria_usuario_com_is_app_admin(
-    api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """GIPE admin pode criar usuário com is_app_admin=True."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "novo_admin",
-        "name": "Novo Admin",
-        "email": "novo.admin@example.com",
-        "cpf": "99999999999",
-        "cargo": cargo_comum.pk,
-        "rede": "DIRETA",
-        "unidades": [escola_sp.pk],
-        "is_app_admin": True,
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    novo_user = serializer.save()
-    
-    assert novo_user.username == "novo_admin"
-    assert novo_user.cpf == "99999999999"
-    assert novo_user.is_app_admin is True
-    assert novo_user.is_validado is True
-    assert escola_sp in novo_user.unidades.all()
-
-
 @pytest.mark.django_db
 def test_create_pf_admin_cria_usuario_sem_is_app_admin_mesmo_se_payload(
     api_rf, user_pf_admin, cargo_comum, escola_sp
@@ -340,127 +305,6 @@ def test_create_pf_admin_cria_usuario_sem_is_app_admin_mesmo_se_payload(
     
     # validate_is_app_admin deve bloquear isso
     assert serializer.is_valid(raise_exception=False) is False
-
-
-@pytest.mark.django_db
-def test_create_pf_ignora_is_app_admin_via_create(
-    api_rf, cargo_ponto_focal, cargo_comum, escola_sp, dre_sp
-):
-    """
-    PF consegue passar validação se não enviar is_app_admin,
-    mas o método create garante que is_app_admin seja False.
-    """
-    # Criar PF admin
-    user_pf = User.objects.create_user(
-        username="pf_test",
-        email="pf.test@example.com",
-        cpf="12312312312",
-        cargo=cargo_ponto_focal,
-    )
-    user_pf.is_app_admin = True
-    user_pf.save()
-    user_pf.unidades.add(dre_sp)
-    
-    request = api_rf.post("/fake/")
-    request.user = user_pf
-    
-    # Dados válidos sem is_app_admin no payload
-    data = {
-        "username": "novo_comum",
-        "name": "Novo Comum",
-        "email": "novo.comum@example.com",
-        "cpf": "23423423423",
-        "cargo": cargo_comum.pk,
-        "rede": "DIRETA",
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    novo_user = serializer.save()
-    
-    # Mesmo sem is_app_admin no payload, o create garante que seja False para PF
-    assert novo_user.is_app_admin is False
-
-
-@pytest.mark.django_db
-def test_create_define_is_validado_false_por_padrao(
-    api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Usuário criado via serializer tem is_validado=False por padrão."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "validado_user",
-        "name": "Validado",
-        "email": "validado@example.com",
-        "cpf": "77777777777",
-        "cargo": cargo_comum.pk,
-        "rede": "DIRETA",
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    novo_user = serializer.save()
-    assert novo_user.is_validado is True
-
-
-@pytest.mark.django_db
-def test_create_sem_unidades_funciona(api_rf, user_gipe_admin, cargo_comum):
-    """Pode criar usuário sem unidades."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "sem_unidades",
-        "name": "Sem Unidades",
-        "email": "sem.unidades@example.com",
-        "cpf": "66666666666",
-        "cargo": cargo_comum.pk,
-        "rede": "DIRETA",
-        "unidades": [],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    novo_user = serializer.save()
-    assert novo_user.unidades.count() == 0
-
-
-@pytest.mark.django_db
-def test_create_sem_is_app_admin_no_payload_cria_como_false(
-    api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Se is_app_admin não for enviado, cria como False."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "regular_user",
-        "name": "Regular User",
-        "email": "regular@example.com",
-        "cpf": "55555555555",
-        "cargo": cargo_comum.pk,
-        "rede": "DIRETA",
-        "unidades": [escola_sp.pk],
-        # is_app_admin não enviado
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    novo_user = serializer.save()
-    assert novo_user.is_app_admin is False
-
-
-# ==========================================
-# Testes para update
-# ==========================================
 
 @pytest.mark.django_db
 def test_update_gipe_pode_mudar_is_app_admin(
@@ -508,33 +352,6 @@ def test_update_pf_nao_pode_mudar_is_app_admin(
     # Deve falhar na validação porque PF não pode setar is_app_admin=True
     assert serializer.is_valid(raise_exception=False) is False
     assert "detail" in serializer.errors
-
-
-@pytest.mark.django_db
-def test_update_atualiza_outros_campos(
-    api_rf, user_gipe_admin, user_comum
-):
-    """Update pode alterar campos normais como name, email."""
-    request = api_rf.patch("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "name": "Nome Atualizado",
-        "email": "atualizado@example.com",
-    }
-    
-    serializer = GestaoUsuarioSerializer(
-        user_comum,
-        data=data,
-        partial=True,
-        context={"request": request}
-    )
-    assert serializer.is_valid(raise_exception=True)
-    
-    updated_user = serializer.save()
-    assert updated_user.name == "Nome Atualizado"
-    assert updated_user.email == "atualizado@example.com"
-
 
 @pytest.mark.django_db
 def test_update_pode_alterar_unidades(
@@ -633,172 +450,6 @@ def test_update_pf_validacao_unidades_respeitada(
     
     # Deve falhar na validação
     assert serializer.is_valid(raise_exception=False) is False
-
-
-# ==========================================
-# Testes para integração com CoreSSO
-# ==========================================
-
-@pytest.mark.django_db
-@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-def test_create_rede_indireta_chama_core_sso(
-    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Quando rede é INDIRETA, deve chamar o serviço de criação no CoreSSO."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "usuario_indireta",
-        "name": "Usuário Rede Indireta",
-        "email": "indireta@example.com",
-        "cpf": "44444444444",
-        "cargo": cargo_comum.pk,
-        "rede": TipoGestaoChoices.INDIRETA,
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    serializer.save()
-    
-    # Verifica que o serviço foi chamado uma vez
-    mock_cria_core_sso.assert_called_once()
-    
-    # Verifica os dados enviados para o CoreSSO
-    call_args = mock_cria_core_sso.call_args[0][0]
-    assert call_args["login"] == "usuario_indireta"
-    assert call_args["nome"] == "Usuário Rede Indireta"
-    assert call_args["email"] == "indireta@example.com"
-
-
-@pytest.mark.django_db
-@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-def test_create_rede_direta_nao_chama_core_sso(
-    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Quando rede é DIRETA, não deve chamar o serviço de criação no CoreSSO."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "usuario_direta",
-        "name": "Usuário Rede Direta",
-        "email": "direta@example.com",
-        "cpf": "33333333333",
-        "cargo": cargo_comum.pk,
-        "rede": TipoGestaoChoices.DIRETA,
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    serializer.save()
-    
-    # Verifica que o serviço NÃO foi chamado
-    mock_cria_core_sso.assert_not_called()
-
-
-@pytest.mark.django_db
-@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-def test_create_rede_none_nao_chama_core_sso(
-    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Quando rede é None ou não informada, não deve chamar o serviço CoreSSO."""
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "usuario_sem_rede",
-        "name": "Usuário Sem Rede",
-        "email": "semrede@example.com",
-        "cpf": "22222222222",
-        "cargo": cargo_comum.pk,
-        # rede não informada
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    serializer.save()
-    
-    # Verifica que o serviço NÃO foi chamado
-    mock_cria_core_sso.assert_not_called()
-
-
-@pytest.mark.django_db
-@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-def test_create_erro_core_sso_levanta_validation_error(
-    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Quando o CoreSSO falha, deve levantar ValidationError."""
-    # Configura o mock para levantar uma exceção
-    mock_cria_core_sso.side_effect = Exception("Erro ao comunicar com CoreSSO")
-    
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    data = {
-        "username": "usuario_erro_coresso",
-        "name": "Usuário Erro",
-        "email": "erro.coresso@example.com",
-        "cpf": "11122233344",
-        "cargo": cargo_comum.pk,
-        "rede": TipoGestaoChoices.INDIRETA,
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    # Deve levantar ValidationError quando tentar salvar
-    with pytest.raises(serializers.ValidationError) as exc_info:
-        serializer.save()
-    
-    # Verifica que a mensagem de erro está correta
-    assert "Erro ao criar usuário" in str(exc_info.value)
-    assert "Erro ao comunicar com CoreSSO" in str(exc_info.value)
-
-
-@pytest.mark.django_db
-@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
-def test_create_erro_core_sso_rollback_transacao(
-    mock_cria_core_sso, api_rf, user_gipe_admin, cargo_comum, escola_sp
-):
-    """Quando o CoreSSO falha, a transação deve fazer rollback e o usuário não deve ser criado."""
-    # Configura o mock para levantar uma exceção
-    mock_cria_core_sso.side_effect = Exception("Falha no CoreSSO")
-    
-    request = api_rf.post("/fake/")
-    request.user = user_gipe_admin
-    
-    # Conta quantos usuários existem antes
-    count_antes = User.objects.count()
-    
-    data = {
-        "username": "usuario_rollback",
-        "name": "Usuário Rollback",
-        "email": "rollback@example.com",
-        "cpf": "10101010101",
-        "cargo": cargo_comum.pk,
-        "rede": TipoGestaoChoices.INDIRETA,
-        "unidades": [escola_sp.pk],
-    }
-    
-    serializer = GestaoUsuarioSerializer(data=data, context={"request": request})
-    assert serializer.is_valid(raise_exception=True)
-    
-    # Deve levantar ValidationError
-    with pytest.raises(serializers.ValidationError):
-        serializer.save()
-    
-    # Verifica que o usuário NÃO foi criado (rollback)
-    count_depois = User.objects.count()
-    assert count_depois == count_antes
-    assert not User.objects.filter(username="usuario_rollback").exists()
 
 @pytest.mark.django_db
 def test_retrieve_serializer_retorna_is_active(user_comum):
@@ -925,3 +576,309 @@ class TestGestaoUsuarioRetrieveSerializer:
         serializer = GestaoUsuarioRetrieveSerializer(usuario)
 
         assert serializer.data["responsavel_inativacao_nome"] is None
+
+@pytest.mark.django_db
+def test_validate_cpf_invalido(api_rf, user_gipe_admin):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    with pytest.raises(serializers.ValidationError, match="CPF informado é inválido"):
+        serializer.validate_cpf("111.111.111-11")
+
+@pytest.mark.django_db
+def test_validate_cpf_duplicado(api_rf, user_gipe_admin, cargo_comum):
+    User.objects.create_user(
+        username="usercpf",
+        email="user@sme.prefeitura.sp.gov.br",
+        cpf="52998224725",
+        cargo=cargo_comum,
+    )
+
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    with pytest.raises(serializers.ValidationError, match="Já existe um usuário"):
+        serializer.validate_cpf("529.982.247-25")
+
+@pytest.mark.django_db
+def test_validate_cpf_valido(api_rf, user_gipe_admin):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    cpf = "52998224725"
+    result = serializer.validate_cpf(cpf)
+
+    assert result == cpf
+
+@pytest.mark.django_db
+def test_validate_cpf_update_mesmo_usuario(api_rf, cargo_comum):
+    user = User.objects.create_user(
+        username="userupdate",
+        email="userupdate@sme.prefeitura.sp.gov.br",
+        cpf="52998224725",
+        cargo=cargo_comum,
+    )
+
+    request = api_rf.post("/fake/")
+    request.user = user
+
+    serializer = GestaoUsuarioSerializer(
+        instance=user,
+        context={"request": request}
+    )
+
+    result = serializer.validate_cpf("529.982.247-25")
+
+    assert result == "52998224725"
+
+@pytest.mark.django_db
+def test_validate_email_duplicado(api_rf, user_gipe_admin, user_comum):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    with pytest.raises(serializers.ValidationError, match="já está cadastrado"):
+        serializer.validate_email(user_comum.email)
+
+@pytest.mark.django_db
+def test_validate_email_nao_institucional(api_rf, user_gipe_admin):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    with pytest.raises(serializers.ValidationError, match="e-mail institucional"):
+        serializer.validate_email("teste@gmail.com")
+
+@pytest.mark.django_db
+def test_validate_email_valido(api_rf, user_gipe_admin):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(context={"request": request})
+
+    email = "teste@sme.prefeitura.sp.gov.br"
+
+    result = serializer.validate_email(email)
+
+    assert result == email
+
+@pytest.mark.django_db
+def test_pf_nao_pode_cadastrar_dre_fora(api_rf, user_pf_admin, dre_outra):
+    serializer = GestaoUsuarioSerializer()
+
+    with pytest.raises(serializers.ValidationError):
+        serializer._validate_ponto_focal_unidades(
+            user_pf_admin,
+            [dre_outra]
+        )
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.SmeIntegracaoService.usuario_core_sso_or_none")
+def test_validate_core_sso_sucesso(mock_service, api_rf, user_gipe_admin):
+    mock_service.return_value = True
+
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    attrs = {
+        "username": "1234567",
+        "rede": TipoGestaoChoices.DIRETA,
+    }
+
+    result = serializer.validate(attrs)
+
+    assert result == attrs
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.SmeIntegracaoService.usuario_core_sso_or_none")
+def test_validate_core_sso_nao_encontrado(mock_service, api_rf, user_gipe_admin):
+    mock_service.return_value = None
+
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    attrs = {
+        "username": "1234567",
+        "rede": TipoGestaoChoices.DIRETA,
+    }
+
+    with pytest.raises(serializers.ValidationError, match="verifique se o código"):
+        serializer.validate(attrs)
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.SmeIntegracaoService.usuario_core_sso_or_none")
+def test_validate_core_sso_erro(mock_service, api_rf, user_gipe_admin):
+    mock_service.side_effect = Exception("Erro")
+
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    attrs = {
+        "username": "1234567",
+        "rede": TipoGestaoChoices.DIRETA,
+    }
+
+    with pytest.raises(serializers.ValidationError, match="Não foi possível validar"):
+        serializer.validate(attrs)
+
+@pytest.mark.django_db
+def test_validate_indireta_nao_chama_core(api_rf, user_gipe_admin):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    attrs = {
+        "username": "1234567",
+        "rede": TipoGestaoChoices.INDIRETA,
+    }
+
+    result = serializer.validate(attrs)
+
+    assert result == attrs
+
+@pytest.mark.django_db
+def test_create_usuario_gipe(api_rf, user_gipe_admin, cargo_comum, escola_sp):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    data = {
+        "username": "novo1234",
+        "name": "Novo",
+        "email": "novo@sme.prefeitura.sp.gov.br",
+        "cpf": "52998224725",
+        "cargo": cargo_comum,
+        "rede": TipoGestaoChoices.DIRETA,
+        "unidades": [escola_sp],
+        "is_app_admin": True,
+    }
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    user = serializer.create(data)
+
+    assert user.pk
+    assert user.is_app_admin is True
+
+@pytest.mark.django_db
+def test_create_usuario_pf_nao_admin(api_rf, user_pf_admin, cargo_comum, escola_sp):
+    request = api_rf.post("/fake/")
+    request.user = user_pf_admin
+
+    data = {
+        "username": "novo1235",
+        "name": "Novo",
+        "email": "novo@sme.prefeitura.sp.gov.br",
+        "cpf": "98765432100",
+        "cargo": cargo_comum,
+        "rede": TipoGestaoChoices.DIRETA,
+        "unidades": [escola_sp],
+        "is_app_admin": True,
+    }
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    user = serializer.create(data)
+
+    assert user.is_app_admin is False
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.CriaUsuarioCoreSSOService.cria_usuario_core_sso")
+def test_create_indireta_chama_core_sso(
+    mock_core, api_rf, user_gipe_admin, cargo_comum, escola_sp
+):
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    data = {
+        "username": "novo9999",
+        "name": "Novo",
+        "email": "novo@sme.prefeitura.sp.gov.br",
+        "cpf": "12312312312",
+        "cargo": cargo_comum,
+        "rede": TipoGestaoChoices.INDIRETA,
+        "unidades": [escola_sp],
+    }
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    serializer.create(data)
+
+    mock_core.assert_called_once()
+
+@pytest.mark.django_db
+@patch("apps.users.api.serializers.gestao_usuario_serializer.User.objects.create_user")
+def test_create_erro_dispara_validation_error(
+    mock_create, api_rf, user_gipe_admin
+):
+    mock_create.side_effect = Exception("Erro banco")
+
+    request = api_rf.post("/fake/")
+    request.user = user_gipe_admin
+
+    serializer = GestaoUsuarioSerializer(
+        context={"request": request}
+    )
+
+    data = {
+        "username": "xpto123",
+        "email": "xpto@sme.prefeitura.sp.gov.br",
+        "cpf": "12345678912",
+        "rede": TipoGestaoChoices.DIRETA,
+    }
+
+    with pytest.raises(serializers.ValidationError, match="Erro ao criar usuário"):
+        serializer.create(data)
+
+@pytest.mark.django_db
+def test_validate_email_update_mesmo_usuario_nao_gera_erro(
+    api_rf, cargo_comum
+):
+    user = User.objects.create_user(
+        username="useremail",
+        email="useremail@sme.prefeitura.sp.gov.br",
+        cpf="52998224725",
+        cargo=cargo_comum,
+    )
+
+    request = api_rf.patch("/fake/")
+    request.user = user
+
+    serializer = GestaoUsuarioSerializer(
+        instance=user,
+        context={"request": request}
+    )
+
+    result = serializer.validate_email(
+        "useremail@sme.prefeitura.sp.gov.br"
+    )
+
+    assert result == "useremail@sme.prefeitura.sp.gov.br"

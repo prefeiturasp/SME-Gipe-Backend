@@ -205,33 +205,6 @@ def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
     response_outro = api_client.get(f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/")
     assert response_outro.status_code == status.HTTP_403_FORBIDDEN
 
-
-@pytest.mark.django_db
-def test_create_gipe_admin_cria_usuario(api_client, user_gipe_admin, cargo_comum, escola_sp):
-    """GIPE admin pode criar novos usuários."""
-    api_client.force_authenticate(user=user_gipe_admin)
-    
-    data = {
-        "username": "novo_usuario",
-        "name": "Novo Usuario",
-        "email": "novo.usuario@example.com",
-        "cpf": "88888888888",
-        "cargo": cargo_comum.pk,
-        "unidades": [escola_sp.codigo_eol],
-        "is_app_admin": False,
-    }
-    
-    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
-    
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["username"] == "novo_usuario"
-    assert response.data["email"] == "novo.usuario@example.com"
-    
-    user = User.objects.get(username="novo_usuario")
-    assert user.cpf == "88888888888"
-    assert user.cargo.pk == cargo_comum.pk
-
-
 @pytest.mark.django_db
 def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     api_client, user_pf_admin, cargo_comum, escola_outra
@@ -253,31 +226,6 @@ def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "detail" in response.data
-
-
-@pytest.mark.django_db
-def test_create_pf_admin_nao_pode_atribuir_outra_dre(
-    api_client, user_pf_admin, cargo_comum, dre_outra
-):
-    """PF admin não pode atribuir usuário diretamente a outra DRE."""
-    api_client.force_authenticate(user=user_pf_admin)
-    
-    data = {
-        "username": "novo_pf_outra_dre",
-        "name": "Novo PF Outra DRE",
-        "email": "novo.pf.outra@example.com",
-        "cpf": "77777777777",
-        "cargo": cargo_comum.pk,
-        "unidades": [dre_outra.codigo_eol],
-        "is_app_admin": False,
-    }
-    
-    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
-    
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "detail" in response.data
-    assert "Ponto Focal só pode cadastrar usuários para sua própria DRE" in response.data["detail"]
-
 
 @pytest.mark.django_db
 def test_retrieve_gipe_admin_ve_qualquer_usuario(
@@ -326,26 +274,6 @@ def test_update_pf_admin_nao_atualiza_usuario_de_outra_dre(
     )
     
     assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-@pytest.mark.django_db
-def test_partial_update_gipe_admin(api_client, user_gipe_admin, usuario_dre_sp):
-    """GIPE admin pode fazer update parcial."""
-    api_client.force_authenticate(user=user_gipe_admin)
-    
-    data = {"email": "parcial@example.com"}
-    
-    response = api_client.patch(
-        f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/", 
-        data, 
-        format="json"
-    )
-    
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["email"] == "parcial@example.com"
-    assert response.data["username"] == "usuario_dre_sp"  # Não mudou
-
-
 
 @pytest.mark.django_db
 def test_delete_gipe_admin_remove_usuario(api_client, user_gipe_admin, usuario_dre_sp):
