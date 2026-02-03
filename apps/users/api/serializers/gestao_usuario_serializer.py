@@ -1,3 +1,4 @@
+import re
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -6,6 +7,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from apps.unidades.models.unidades import TipoGestaoChoices, Unidade, TipoUnidadeChoices
 from apps.users.services.usuario_core_sso_service import CriaUsuarioCoreSSOService
+from apps.users.services.sme_integracao_service import SmeIntegracaoService
 
 User = get_user_model()
 
@@ -124,6 +126,13 @@ class GestaoUsuarioListaSerializer(serializers.ModelSerializer):
 class GestaoUsuarioSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
         required=True,
+        min_length=7,
+        error_messages={
+            "required": "Campo RF é obrigatório!",
+            "blank": "Campo RF não pode ser vazio!",
+            "null": "Campo RF não pode ser nulo!",
+            "min_length": "O RF deve conter no mínimo 7 caracteres.",
+        },
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),
@@ -133,18 +142,43 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
     )
     cpf = serializers.CharField(
         required=True,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message="Já existe um usuário cadastrado com este CPF."
-            )
-        ]
+        error_messages={
+            "required": "Campo CPF é obrigatório!",
+            "blank": "Campo CPF não pode ser vazio!",
+            "null": "Campo CPF não pode ser nulo!",
+        }
+    )
+    email = serializers.EmailField(
+        required=True,
+        error_messages={
+            "required": "Campo e-mail é obrigatório!",
+            "blank": "Campo e-mail não pode ser vazio!",
+            "null": "Campo e-mail não pode ser nulo!",
+            "invalid": "E-mail inválido.",
+        }
     )
     unidades = serializers.PrimaryKeyRelatedField(
         queryset=Unidade.objects.all(),
-        many=True
+        many=True,
+        required=True,
+        error_messages={
+            "required": "Campo unidades é obrigatório!",
+            "blank": "Campo unidades não pode ser vazio!",
+            "null": "Campo unidades não pode ser nulo!",
+            "not_a_list": "O campo unidades deve ser uma lista.",
+            "invalid": "Unidade inválida.",
+        }
     )
     is_app_admin = serializers.BooleanField(required=False)
+    rede = serializers.ChoiceField(
+        choices=TipoGestaoChoices.choices,
+        required=True,
+        error_messages={
+            "required": "Campo rede é obrigatório!",
+            "null": "Campo rede não pode ser nulo!",
+            "invalid_choice": "Valor inválido para o campo rede.",
+        }
+    )
     
     class Meta:
         model = User
@@ -161,6 +195,50 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
             "is_app_admin",
             "is_core_sso",
         ]
+
+    def validate_cpf(self, value):
+        """
+        Valida, normaliza e verifica unicidade do CPF.
+        """
+
+        cpf = re.sub(r"\D", "", value)
+
+        if len(cpf) != 11 or cpf == cpf[0] * 11:
+            raise serializers.ValidationError("CPF informado é inválido!")
+
+        qs = User.objects.filter(cpf=cpf)
+
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Já existe um usuário cadastrado com este CPF."
+            )
+
+        return cpf
+
+    def validate_email(self, value):
+        """
+        Valida e-mail institucional e unicidade.
+        """
+
+        qs = User.objects.filter(email=value)
+
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Este e-mail já está cadastrado."
+            )
+
+        if not value.endswith("@sme.prefeitura.sp.gov.br"):
+            raise serializers.ValidationError(
+                "Utilize seu e-mail institucional."
+            )
+
+        return value
 
     def _validate_ponto_focal_unidades(self, user, unidades):
         """
@@ -211,11 +289,38 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
         """
         request = self.context["request"]
         user = request.user
-        if not user.is_gipe:
+
+        if value and not user.is_gipe:
             raise serializers.ValidationError(
                 "Somente usuários com perfil GIPE podem atribuir ou remover perfil administrador."
             )
         return value
+    
+    def validate(self, attrs):
+
+        if self.instance is None:
+
+            rede = attrs.get("rede")
+            if rede == TipoGestaoChoices.INDIRETA:
+                return attrs
+
+            rf = attrs.get("username")
+            try:
+                resultado = SmeIntegracaoService.usuario_core_sso_or_none(
+                    login=rf
+                )
+
+            except Exception:
+                raise serializers.ValidationError(
+                    "Não foi possível validar o usuário no momento. Tente novamente mais tarde."
+                )
+
+            if not resultado:
+                raise serializers.ValidationError(
+                    "Por favor, verifique se o código está correto e tente novamente."
+                )
+
+        return attrs
     
     def is_valid(self, raise_exception=False):
 
@@ -273,7 +378,7 @@ class GestaoUsuarioSerializer(serializers.ModelSerializer):
                     CriaUsuarioCoreSSOService.cria_usuario_core_sso(dados_usuario_a_ser_enviado_coresso)
                 
         except Exception as e:
-            raise serializers.ValidationError(f"Erro ao criar usuário: {str(e)}")
+            raise serializers.ValidationError({'detail': f"Erro ao criar usuário: {str(e)}"})
 
         return novo_user
 

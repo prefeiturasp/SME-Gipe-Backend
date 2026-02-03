@@ -5,6 +5,8 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
+from apps.unidades.services.consulta_unidade_eol_service import ConsultaDadosEolService
+from apps.helpers.exceptions import InternalError, SmeIntegracaoException
 
 User = get_user_model()
 
@@ -121,6 +123,26 @@ class GestaoUnidadeSerializer(serializers.ModelSerializer):
 
         if tipo != TipoUnidadeChoices.DRE and not dre_uuid:
             raise serializers.ValidationError({"dre": "Para unidades que não são DRE, a DRE é obrigatória."})
+        
+        rede = attrs.get("rede")
+        if rede == TipoGestaoChoices.INDIRETA:
+            return attrs
+        
+        codigo_eol = attrs.get("codigo_eol")
+        try:
+            ConsultaDadosEolService.consultar_dados_unidade(
+                codigo_eol
+            )
+
+        except SmeIntegracaoException:
+            raise serializers.ValidationError(
+                "Por favor, verifique se o código está correto e tente novamente."
+            )
+
+        except InternalError:
+            raise serializers.ValidationError(
+                "Não foi possível validar a unidade no momento. Tente novamente mais tarde."
+            )
 
         return attrs
     

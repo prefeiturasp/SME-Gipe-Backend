@@ -88,4 +88,4 @@ class TestConsultaDadosEolService:
         with pytest.raises(InternalError) as exc:
             ConsultaDadosEolService.consultar_dados_unidade("222222")
 
-        assert "Erro interno" in str(exc.value)
+        assert str(exc.value) == "Não foi possível realizar a consulta. Tente novamente mais tarde."
