@@ -74,4 +74,4 @@ class ConsultaDadosEolService:
                 codigo_escola_eol,
                 str(e),
             )
-            raise InternalError(f"Erro interno: {str(e)}")
+            raise InternalError("Não foi possível realizar a consulta. Tente novamente mais tarde.")
