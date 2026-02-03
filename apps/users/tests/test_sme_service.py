@@ -89,7 +89,7 @@ class TestUsuarioCoreSSOOrNone:
         with pytest.raises(SmeIntegracaoException) as exc:
             SmeIntegracaoService.usuario_core_sso_or_none("12345678901")
 
-        assert "Erro ao procurar usuário" in str(exc.value)
+        assert str(exc.value) == "Não foi possível realizar a consulta. Tente novamente mais tarde."
 
 
 @patch("apps.users.services.sme_integracao_service.requests.post")

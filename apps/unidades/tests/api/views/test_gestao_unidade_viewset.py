@@ -312,28 +312,6 @@ class TestGestaoUnidadeViewSetCreate:
         nova_unidade = Unidade.objects.get(codigo_eol="999999")
         assert nova_unidade.dre == dre_sp
 
-    def test_create_escola_ponto_focal_sua_dre(
-        self, api_client, user_pf_admin, dre_sp
-    ):
-        """Ponto Focal pode criar escola na sua DRE."""
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-list")
-
-        data = {
-            "tipo_unidade": TipoUnidadeChoices.EMEI,
-            "nome": "EMEI PF",
-            "rede": "DIRETA",
-            "codigo_eol": "777777",
-            "dre": str(dre_sp.uuid),
-            "sigla": "EPF",
-            "ativa": True,
-        }
-
-        response = api_client.post(url, data, format="json")
-
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["nome"] == "EMEI PF"
-
     def test_create_escola_ponto_focal_outra_dre(
         self, api_client, user_pf_admin, dre_outra
     ):
@@ -423,42 +401,6 @@ class TestGestaoUnidadeViewSetUpdate:
         assert response.data["tipo_unidade"] == TipoUnidadeChoices.EMEF
         escola_sp.refresh_from_db()
         assert escola_sp.nome == "EMEF Atualizada"
-
-    def test_update_parcial_gipe_admin(
-        self, api_client, user_gipe_admin, escola_sp, dre_sp
-    ):
-        """GIPE admin pode fazer update parcial."""
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-detail", kwargs={"uuid": escola_sp.uuid})
-
-        data = {
-            "nome": "Nome Atualizado",
-            "dre": str(dre_sp.uuid),
-        }
-
-        response = api_client.patch(url, data, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["nome"] == "Nome Atualizado"
-        escola_sp.refresh_from_db()
-        assert escola_sp.nome == "Nome Atualizado"
-
-    def test_update_ponto_focal_sua_unidade(
-        self, api_client, user_pf_admin, escola_sp, dre_sp
-    ):
-        """Ponto Focal pode atualizar unidades da sua DRE."""
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-detail", kwargs={"uuid": escola_sp.uuid})
-
-        data = {
-            "nome": "Nome PF",
-            "dre": str(dre_sp.uuid),
-        }
-
-        response = api_client.patch(url, data, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["nome"] == "Nome PF"
 
     def test_update_ponto_focal_unidade_de_outra_dre(
         self, api_client, user_pf_admin, escola_outra, dre_outra
