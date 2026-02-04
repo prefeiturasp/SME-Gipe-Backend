@@ -902,3 +902,22 @@ class TestUnidadeViewSetConsultarEOL:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "ainda não está cadastrada" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_invalida_para_nao_dre(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": None,
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=222222&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "não pertence a uma DRE" in response.data["detail"]
