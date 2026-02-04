@@ -195,6 +195,12 @@ class ConsultaEolValidator:
                 "O código EOL informado pertence a uma DRE. "
                 "Verifique se a etapa/modalidade selecionada está correta."
             )
+        
+        if etapa_modalidade == "DRE" and not is_dre:
+            raise ValidationError(
+                "O código EOL informado não pertence a uma DRE. "
+                "Verifique se a etapa/modalidade selecionada está correta."
+            )
 
     @staticmethod
     def validar_permissao_usuario(user):
