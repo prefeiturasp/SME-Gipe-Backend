@@ -125,58 +125,106 @@ class GestaoUnidadeViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="consultar-eol")
     def consultar_eol(self, request):
-        user = request.user
 
+        user = request.user
         codigo_eol = request.query_params.get("codigo_eol")
+        etapa_modalidade = request.query_params.get("etapa_modalidade")
         try:
             unidade_eol = ConsultaDadosEolService.consultar_dados_unidade(codigo_eol)
-            codigo_dre_core_sso = unidade_eol["codigoDRE"]
-
-            is_dre = unidade_eol["codigo"] == codigo_dre_core_sso
-            dre_da_unidade = unidade_eol["codigoDRE"]
-            dre_do_usuario = user.unidades.values_list('codigo_eol', flat=True).first()
-
         except Exception as e:
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not user.is_gipe and not user.is_ponto_focal:
+        codigo_dre = unidade_eol["codigoDRE"]
+        is_dre = unidade_eol["codigo"] == codigo_dre
+
+        dre_da_unidade = codigo_dre
+        dre_do_usuario = user.unidades.values_list("codigo_eol", flat=True).first()
+
+        try:
+            validator = ConsultaEolValidator()
+            validator.validar_etapa_modalidade(etapa_modalidade, is_dre)
+            validator.validar_permissao_usuario(user)
+            validator.validar_ponto_focal(
+                user,
+                is_dre,
+                dre_da_unidade,
+                dre_do_usuario
+            )
+            validator.validar_gipe(
+                user,
+                is_dre,
+                codigo_dre
+            )
+
+        except ValidationError as e:
             return Response(
-                {"detail": "Usuário sem permissão para realizar esta ação."},
+                {"detail": e.detail[0]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if user.is_ponto_focal:
-            if is_dre:
-                return Response(
-                    {"detail": "Ponto focal não pode cadastrar DRE."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if dre_da_unidade != dre_do_usuario:
-                return Response(
-                    {"detail": "A unidade não pertence à sua DRE."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            
-        if user.is_gipe:
-            dre_cadastrada = Unidade.objects.filter(codigo_eol=codigo_dre_core_sso).exists()
-            if not dre_cadastrada:
-                return Response(
-                    {"detail": "A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        except Exception as e:
+            return Response(
+                {"detail": "Erro interno do servidor."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         data = {
-            "etapa_modalidade": unidade_eol.get("siglaTipoEscola", "").strip() if unidade_eol.get("siglaTipoEscola") else "",
+            "etapa_modalidade": (unidade_eol.get("siglaTipoEscola") or "").strip(),
             "nome_unidade": unidade_eol.get("nomeExibicao"),
-            "codigo_dre": unidade_eol.get("codigoDRE", ""),
+            "codigo_dre": codigo_dre,
         }
 
         if is_dre:
-            data["etapa_modalidade"] = "DRE"
-            data["nome_unidade"] = unidade_eol.get("nomeDRE", "")
+            data.update({
+                "etapa_modalidade": "DRE",
+                "nome_unidade": unidade_eol.get("nomeDRE", ""),
+            })
 
         return Response(data, status=status.HTTP_200_OK)
+
+
+class ConsultaEolValidator:
+
+    @staticmethod
+    def validar_etapa_modalidade(etapa_modalidade, is_dre):
+        if etapa_modalidade != "DRE" and is_dre:
+            raise ValidationError(
+                "O código EOL informado pertence a uma DRE. "
+                "Verifique se a etapa/modalidade selecionada está correta."
+            )
+        
+        if etapa_modalidade == "DRE" and not is_dre:
+            raise ValidationError(
+                "O código EOL informado não pertence a uma DRE. "
+                "Verifique se a etapa/modalidade selecionada está correta."
+            )
+
+    @staticmethod
+    def validar_permissao_usuario(user):
+        if not user.is_gipe and not user.is_ponto_focal:
+            raise ValidationError("Usuário sem permissão para realizar esta ação.")
+
+    @staticmethod
+    def validar_ponto_focal(user, is_dre, dre_da_unidade, dre_do_usuario):
+        if not user.is_ponto_focal:
+            return
+
+        if is_dre:
+            raise ValidationError("Ponto focal não pode cadastrar DRE.")
+
+        if dre_da_unidade != dre_do_usuario:
+            raise ValidationError("A unidade não pertence à sua DRE.")
+
+    @staticmethod
+    def validar_gipe(user, is_dre, codigo_dre):
+        if not user.is_gipe or is_dre:
+            return
+
+        dre_cadastrada = Unidade.objects.filter(codigo_eol=codigo_dre).exists()
+        if not dre_cadastrada:
+            raise ValidationError(
+                "A DRE vinculada ao código EOL informado ainda não está cadastrada."
+            )
