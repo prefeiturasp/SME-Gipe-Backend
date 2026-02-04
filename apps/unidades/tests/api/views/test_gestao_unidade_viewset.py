@@ -743,24 +743,6 @@ class TestUnidadeViewSetConsultarEOL:
         return usuario
 
     @patch(PATCH_PATH)
-    def test_consultar_eol_dre_sucesso_gipe(
-        self, mock_consulta, api_client, usuario_gipe, dre
-    ):
-        api_client.force_authenticate(usuario_gipe)
-
-        mock_consulta.return_value = {
-            "codigo": "111111",
-            "codigoDRE": "111111",
-            "nomeDRE": "DRE Teste",
-        }
-
-        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={dre.pk}")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["etapa_modalidade"] == "DRE"
-        assert response.data["nome_unidade"] == "DRE Teste"
-
-    @patch(PATCH_PATH)
     def test_consultar_eol_ue_sucesso(
         self, mock_consulta, api_client, usuario_gipe, ue_indireta
     ):
@@ -796,23 +778,6 @@ class TestUnidadeViewSetConsultarEOL:
         assert "Usuário sem permissão" in response.data["detail"]
 
     @patch(PATCH_PATH)
-    def test_ponto_focal_nao_pode_cadastrar_dre(
-        self, mock_consulta, api_client, usuario_ponto_focal, dre
-    ):
-        api_client.force_authenticate(usuario_ponto_focal)
-
-        mock_consulta.return_value = {
-            "codigo": "111111",
-            "codigoDRE": "111111",
-            "nomeDRE": "DRE Teste",
-        }
-
-        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={dre.pk}")
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
-
-    @patch(PATCH_PATH)
     def test_ponto_focal_ue_fora_da_dre(
         self, mock_consulta, api_client, usuario_ponto_focal, ue_indireta
     ):
@@ -841,24 +806,99 @@ class TestUnidadeViewSetConsultarEOL:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["detail"] == "Erro no EOL"
 
+    @patch("apps.unidades.api.views.gestao_unidade_viewset.ConsultaEolValidator.validar_permissao_usuario")
     @patch(PATCH_PATH)
-    def test_gipe_dre_nao_cadastrada_no_sistema(
-        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    def test_consultar_eol_erro_interno(
+        self, mock_consulta, mock_validar, api_client, usuario_gipe
     ):
         api_client.force_authenticate(usuario_gipe)
 
-        Unidade.objects.filter(codigo_eol="999999").delete()
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+        }
+
+        mock_validar.side_effect = Exception("Erro inesperado")
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=222222"
+        )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data["detail"] == "Erro interno do servidor."
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_sucesso(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Central",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=111111&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "DRE"
+        assert response.data["nome_unidade"] == "DRE Central"
+    
+    @patch(PATCH_PATH)
+    def test_consultar_eol_etapa_invalida_para_dre(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=111111&etapa_modalidade=CEI"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "pertence a uma DRE" in response.data["detail"]
+    
+    @patch(PATCH_PATH)
+    def test_ponto_focal_nao_pode_cadastrar_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=111111&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
+    
+    @patch(PATCH_PATH)
+    def test_gipe_dre_nao_cadastrada(
+        self, mock_consulta, api_client, usuario_gipe, db
+    ):
+        api_client.force_authenticate(usuario_gipe)
 
         mock_consulta.return_value = {
             "codigo": "222222",
             "codigoDRE": "999999",
-            "siglaTipoEscola": "CEI ",
-            "nomeExibicao": "UE Indireta",
         }
 
         response = api_client.get(
-            f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}"
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=222222"
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["detail"] == "A DRE vinculada ao código EOL informado ainda não está na nossa base de dados. Cadastre a DRE para prosseguir com a unidade educacional."
+        assert "ainda não está cadastrada" in response.data["detail"]
