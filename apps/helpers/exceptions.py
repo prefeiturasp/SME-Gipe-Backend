@@ -35,3 +35,7 @@ class TokenJaUtilizadoException(Exception):
 class TokenExpiradoException(Exception):
     """Token de validação expirou."""
     pass
+
+class IntercorrenciasDeletionError(Exception):
+    """Exceção lançada quando há falha ao deletar intercorrências de um usuário."""
+    pass

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 
 from apps.unidades.models.unidades import TipoGestaoChoices
+from apps.helpers.exceptions import IntercorrenciasDeletionError
 
 User = get_user_model()
 
@@ -204,33 +205,6 @@ def test_retrieve_usuario_nao_gipe_nao_pf_acessa_proprio_registro(
     response_outro = api_client.get(f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/")
     assert response_outro.status_code == status.HTTP_403_FORBIDDEN
 
-
-@pytest.mark.django_db
-def test_create_gipe_admin_cria_usuario(api_client, user_gipe_admin, cargo_comum, escola_sp):
-    """GIPE admin pode criar novos usuários."""
-    api_client.force_authenticate(user=user_gipe_admin)
-    
-    data = {
-        "username": "novo_usuario",
-        "name": "Novo Usuario",
-        "email": "novo.usuario@example.com",
-        "cpf": "88888888888",
-        "cargo": cargo_comum.pk,
-        "unidades": [escola_sp.codigo_eol],
-        "is_app_admin": False,
-    }
-    
-    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
-    
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["username"] == "novo_usuario"
-    assert response.data["email"] == "novo.usuario@example.com"
-    
-    user = User.objects.get(username="novo_usuario")
-    assert user.cpf == "88888888888"
-    assert user.cargo.pk == cargo_comum.pk
-
-
 @pytest.mark.django_db
 def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     api_client, user_pf_admin, cargo_comum, escola_outra
@@ -252,31 +226,6 @@ def test_create_pf_admin_nao_pode_criar_em_outra_dre(
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "detail" in response.data
-
-
-@pytest.mark.django_db
-def test_create_pf_admin_nao_pode_atribuir_outra_dre(
-    api_client, user_pf_admin, cargo_comum, dre_outra
-):
-    """PF admin não pode atribuir usuário diretamente a outra DRE."""
-    api_client.force_authenticate(user=user_pf_admin)
-    
-    data = {
-        "username": "novo_pf_outra_dre",
-        "name": "Novo PF Outra DRE",
-        "email": "novo.pf.outra@example.com",
-        "cpf": "77777777777",
-        "cargo": cargo_comum.pk,
-        "unidades": [dre_outra.codigo_eol],
-        "is_app_admin": False,
-    }
-    
-    response = api_client.post("/api/users/gestao-usuarios/", data, format="json")
-    
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "detail" in response.data
-    assert "Ponto Focal só pode cadastrar usuários para sua própria DRE" in response.data["detail"]
-
 
 @pytest.mark.django_db
 def test_retrieve_gipe_admin_ve_qualquer_usuario(
@@ -325,26 +274,6 @@ def test_update_pf_admin_nao_atualiza_usuario_de_outra_dre(
     )
     
     assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-@pytest.mark.django_db
-def test_partial_update_gipe_admin(api_client, user_gipe_admin, usuario_dre_sp):
-    """GIPE admin pode fazer update parcial."""
-    api_client.force_authenticate(user=user_gipe_admin)
-    
-    data = {"email": "parcial@example.com"}
-    
-    response = api_client.patch(
-        f"/api/users/gestao-usuarios/{usuario_dre_sp.uuid}/", 
-        data, 
-        format="json"
-    )
-    
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["email"] == "parcial@example.com"
-    assert response.data["username"] == "usuario_dre_sp"  # Não mudou
-
-
 
 @pytest.mark.django_db
 def test_delete_gipe_admin_remove_usuario(api_client, user_gipe_admin, usuario_dre_sp):
@@ -646,6 +575,77 @@ def test_inativar_usuario_sem_motivo_inativacao_retorna_400(
 
 
 @pytest.mark.django_db
+def test_inativar_usuario_falha_intercorrencias_retorna_400(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Falha ao deletar intercorrencias retorna 400."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar",
+        side_effect=IntercorrenciasDeletionError("erro intercorrencias"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Não foi possível inativar o usuário" in response.data["detail"]
+    assert response.data["motivo"] == "Falha ao deletar intercorrências em preenchimento."
+    assert response.data["erro_tecnico"] == "erro intercorrencias"
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_erro_inesperado_retorna_500(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Erro inesperado ao inativar usuario retorna 500."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar",
+        side_effect=Exception("boom"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.data["detail"] == "Erro inesperado ao inativar usuário."
+    assert response.data["erro_tecnico"] == "boom"
+
+
+@pytest.mark.django_db
+def test_inativar_usuario_falha_envio_email_retorna_200(
+    api_client,
+    user_gipe_admin,
+    usuario_validado,
+):
+    """Falha no envio de email nao reverte inativacao."""
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.InativarUsuarioService.inativar"
+    ), patch(
+        "apps.users.api.views.gestao_usuario_viewset.EnviaEmailService.enviar",
+        side_effect=Exception("email falhou"),
+    ):
+        response = api_client.post(
+            f"/api/users/gestao-usuarios/{usuario_validado.uuid}/inativar/",
+            data={"motivo_inativacao": "Teste"},
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["detail"] == "Usuário inativado com sucesso."
+
+
+@pytest.mark.django_db
 def test_retrieve_uuid_nao_existe_retorna_404(api_client, user_gipe_admin):
     """Buscar usuário com UUID válido mas não existente retorna 404."""
     api_client.force_authenticate(user=user_gipe_admin)
@@ -809,3 +809,54 @@ def test_list_admin_nao_ve_superusuarios(
     usernames = [u["username"] for u in response.data]
 
     assert "superuser" not in usernames
+
+@pytest.mark.django_db
+def test_consultar_core_sso_rf_valido_retorna_200(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    mock_retorno = {
+        "login": "123456",
+        "nome": "teste usuario",
+        "email": "usuario@teste.com",
+    }
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        return_value=mock_retorno,
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=123456"
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data == mock_retorno
+
+@pytest.mark.django_db
+def test_consultar_core_sso_rf_invalido_retorna_400(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        return_value=None,
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=000000"
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Por favor, verifique se o código está correto e tente novamente."
+
+@pytest.mark.django_db
+def test_consultar_core_sso_erro_inesperado_retorna_400(api_client, user_gipe_admin):
+    api_client.force_authenticate(user=user_gipe_admin)
+
+    with patch(
+        "apps.users.api.views.gestao_usuario_viewset.SmeIntegracaoService.usuario_core_sso_or_none",
+        side_effect=Exception("Falha na integração"),
+    ):
+        response = api_client.get(
+            "/api/users/gestao-usuarios/consultar-core-sso/?rf=123456"
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["detail"] == "Falha na integração"

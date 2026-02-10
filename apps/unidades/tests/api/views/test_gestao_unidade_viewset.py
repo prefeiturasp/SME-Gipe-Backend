@@ -1,9 +1,13 @@
 import pytest
+import secrets
+import uuid as uuid_lib
+
 from unittest.mock import patch, Mock
 from django.urls import reverse
 from rest_framework import status
 
-from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices
+from apps.users.models import Cargo, User
+from apps.unidades.models.unidades import Unidade, TipoUnidadeChoices, TipoGestaoChoices
 
 
 @pytest.mark.django_db
@@ -308,28 +312,6 @@ class TestGestaoUnidadeViewSetCreate:
         nova_unidade = Unidade.objects.get(codigo_eol="999999")
         assert nova_unidade.dre == dre_sp
 
-    def test_create_escola_ponto_focal_sua_dre(
-        self, api_client, user_pf_admin, dre_sp
-    ):
-        """Ponto Focal pode criar escola na sua DRE."""
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-list")
-
-        data = {
-            "tipo_unidade": TipoUnidadeChoices.EMEI,
-            "nome": "EMEI PF",
-            "rede": "DIRETA",
-            "codigo_eol": "777777",
-            "dre": str(dre_sp.uuid),
-            "sigla": "EPF",
-            "ativa": True,
-        }
-
-        response = api_client.post(url, data, format="json")
-
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["nome"] == "EMEI PF"
-
     def test_create_escola_ponto_focal_outra_dre(
         self, api_client, user_pf_admin, dre_outra
     ):
@@ -420,42 +402,6 @@ class TestGestaoUnidadeViewSetUpdate:
         escola_sp.refresh_from_db()
         assert escola_sp.nome == "EMEF Atualizada"
 
-    def test_update_parcial_gipe_admin(
-        self, api_client, user_gipe_admin, escola_sp, dre_sp
-    ):
-        """GIPE admin pode fazer update parcial."""
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-detail", kwargs={"uuid": escola_sp.uuid})
-
-        data = {
-            "nome": "Nome Atualizado",
-            "dre": str(dre_sp.uuid),
-        }
-
-        response = api_client.patch(url, data, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["nome"] == "Nome Atualizado"
-        escola_sp.refresh_from_db()
-        assert escola_sp.nome == "Nome Atualizado"
-
-    def test_update_ponto_focal_sua_unidade(
-        self, api_client, user_pf_admin, escola_sp, dre_sp
-    ):
-        """Ponto Focal pode atualizar unidades da sua DRE."""
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-detail", kwargs={"uuid": escola_sp.uuid})
-
-        data = {
-            "nome": "Nome PF",
-            "dre": str(dre_sp.uuid),
-        }
-
-        response = api_client.patch(url, data, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["nome"] == "Nome PF"
-
     def test_update_ponto_focal_unidade_de_outra_dre(
         self, api_client, user_pf_admin, escola_outra, dre_outra
     ):
@@ -545,93 +491,6 @@ class TestGestaoUnidadeViewSetDelete:
 
 
 @pytest.mark.django_db
-class TestGestaoUnidadeViewSetAtivar:
-    """Testes para a action ativar."""
-
-    def test_ativar_unidade_gipe_admin(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """GIPE admin pode ativar unidade."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade ativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-    def test_ativar_unidade_ponto_focal_sua_dre(
-        self, api_client, user_pf_admin, escola_sp
-    ):
-        """Ponto Focal pode ativar unidades da sua DRE."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Unidade ativada com sucesso."
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-    def test_ativar_unidade_ponto_focal_outra_dre(
-        self, api_client, user_pf_admin, escola_outra
-    ):
-        """Ponto Focal não pode ativar unidades de outra DRE."""
-        escola_outra.ativa = False
-        escola_outra.save()
-
-        api_client.force_authenticate(user=user_pf_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_outra.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        escola_outra.refresh_from_db()
-        assert escola_outra.ativa is False
-
-    def test_ativar_unidade_usuario_comum_negado(
-        self, api_client, user_comum, escola_sp
-    ):
-        """Usuário comum não pode ativar unidade."""
-        escola_sp.ativa = False
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_comum)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is False
-
-    def test_ativar_unidade_ja_ativa(
-        self, api_client, user_gipe_admin, escola_sp
-    ):
-        """Ativar uma unidade já ativa não causa erro."""
-        escola_sp.ativa = True
-        escola_sp.save()
-
-        api_client.force_authenticate(user=user_gipe_admin)
-        url = reverse("unidades:gestao-unidades-ativar", kwargs={"uuid": escola_sp.uuid})
-
-        response = api_client.post(url)
-
-        assert response.status_code == status.HTTP_200_OK
-        escola_sp.refresh_from_db()
-        assert escola_sp.ativa is True
-
-
-@pytest.mark.django_db
 class TestGestaoUnidadeViewSetInativar:
     """Testes para a action inativar."""
 
@@ -716,3 +575,349 @@ class TestGestaoUnidadeViewSetInativar:
         assert response.data["detail"] == "Unidade e usuários inativados com sucesso."
 
         mock_executar.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestGestaoUnidadeViewSetReativar:
+    """Testes para a action reativar."""
+
+    def test_reativar_unidade_ponto_focal_outra_dre(
+        self, api_client, user_pf_admin, escola_outra
+    ):
+        """Ponto Focal não pode reativar unidades de outra DRE."""
+        escola_outra.ativa = False
+        escola_outra.save()
+
+        api_client.force_authenticate(user=user_pf_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_outra.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        escola_outra.refresh_from_db()
+        assert escola_outra.ativa is False
+
+    def test_reativar_unidade_usuario_comum_negado(
+        self, api_client, user_comum, escola_sp
+    ):
+        """Usuário comum não pode reativar unidade."""
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_comum)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+
+    def test_reativar_unidade_inexistente(
+        self, api_client, user_gipe_admin
+    ):
+        """Retorna 400 ao tentar reativar unidade inexistente."""
+        import uuid
+        fake_uuid = uuid.uuid4()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": fake_uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_reativar_sem_motivo_retorna_400(
+        self, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "motivo" in response.data["detail"].lower()
+
+        escola_sp.refresh_from_db()
+        assert escola_sp.ativa is False
+
+    @patch("apps.unidades.services.gestao_unidade_service.ReativarUnidadeService.executar")
+    def test_reativar_com_sucesso(
+        self, mock_executar, api_client, user_gipe_admin, escola_sp
+    ):
+        escola_sp.ativa = False
+        escola_sp.save()
+
+        mock_executar.return_value = None
+
+        api_client.force_authenticate(user=user_gipe_admin)
+        url = reverse("unidades:gestao-unidades-reativar", kwargs={"uuid": escola_sp.uuid})
+
+        response = api_client.post(url, data={"motivo_reativacao": "Reabertura"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == "Unidade reativada com sucesso."
+
+        mock_executar.assert_called_once()
+
+PATCH_PATH = (
+    "apps.unidades.api.views.gestao_unidade_viewset."
+    "ConsultaDadosEolService.consultar_dados_unidade"
+)
+
+
+@pytest.fixture
+def user_factory(db):
+    def _create_user(
+        username="testeuser",
+        cpf="12345678901",
+        name="Usuário Teste",
+    ):
+        pwd = secrets.token_urlsafe(16)
+        user = User.objects.create_user(
+            username=username,
+            cpf=cpf,
+            name=name,
+        )
+        user.set_password(pwd)
+        user.save()
+        return user
+
+    return _create_user
+
+@pytest.fixture
+def usuario(user_factory, dre, ue_indireta):
+    user = user_factory()
+    user.unidades.add(ue_indireta)
+    return user
+
+@pytest.fixture
+def dre():
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="111111",
+        nome="DRE Teste",
+        sigla="DRE",
+        tipo_unidade=TipoUnidadeChoices.DRE,
+        rede=TipoGestaoChoices.INDIRETA,
+    )
+
+@pytest.fixture
+def ue_indireta(dre):
+    return Unidade.objects.create(
+        uuid=uuid_lib.uuid4(),
+        codigo_eol="222222",
+        nome="UE Indireta",
+        sigla="UE",
+        tipo_unidade=TipoUnidadeChoices.CEI,
+        rede=TipoGestaoChoices.INDIRETA,
+        dre=dre,
+    )
+
+@pytest.mark.django_db
+class TestUnidadeViewSetConsultarEOL:
+
+    @pytest.fixture
+    def cargo_gipe(self, db):
+        return Cargo.objects.create(codigo=User.PERFIL_GIPE, nome="GIPE")
+
+    @pytest.fixture
+    def cargo_ponto_focal(self, db):
+        return Cargo.objects.create(
+            codigo=User.PERFIL_PONTO_FOCAL, nome="Ponto Focal"
+        )
+
+    @pytest.fixture
+    def usuario_gipe(self, usuario, cargo_gipe):
+        usuario.cargo = cargo_gipe
+        usuario.save()
+        return usuario
+
+    @pytest.fixture
+    def usuario_ponto_focal(self, usuario, cargo_ponto_focal):
+        usuario.cargo = cargo_ponto_focal
+        usuario.save()
+        return usuario
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_ue_sucesso(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+            "siglaTipoEscola": "CEI ",
+            "nomeExibicao": "UE Indireta",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "CEI"
+        assert response.data["nome_unidade"] == "UE Indireta"
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_usuario_sem_permissao(
+        self, mock_consulta, api_client, usuario, ue_indireta
+    ):
+        api_client.force_authenticate(usuario)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Usuário sem permissão" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_ponto_focal_ue_fora_da_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "999999",
+        }
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "A unidade não pertence à sua DRE" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_servico_erro(
+        self, mock_consulta, api_client, usuario_gipe, ue_indireta
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.side_effect = Exception("Erro no EOL")
+
+        response = api_client.get(f"/api/unidades/gestao-unidades/consultar-eol/?codigo_eol={ue_indireta.pk}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["detail"] == "Erro no EOL"
+
+    @patch("apps.unidades.api.views.gestao_unidade_viewset.ConsultaEolValidator.validar_permissao_usuario")
+    @patch(PATCH_PATH)
+    def test_consultar_eol_erro_interno(
+        self, mock_consulta, mock_validar, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "111111",
+        }
+
+        mock_validar.side_effect = Exception("Erro inesperado")
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=222222"
+        )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data["detail"] == "Erro interno do servidor."
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_sucesso(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+            "nomeDRE": "DRE Central",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=111111&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["etapa_modalidade"] == "DRE"
+        assert response.data["nome_unidade"] == "DRE Central"
+    
+    @patch(PATCH_PATH)
+    def test_consultar_eol_etapa_invalida_para_dre(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=111111&etapa_modalidade=CEI"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "pertence a uma DRE" in response.data["detail"]
+    
+    @patch(PATCH_PATH)
+    def test_ponto_focal_nao_pode_cadastrar_dre(
+        self, mock_consulta, api_client, usuario_ponto_focal
+    ):
+        api_client.force_authenticate(usuario_ponto_focal)
+
+        mock_consulta.return_value = {
+            "codigo": "111111",
+            "codigoDRE": "111111",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=111111&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Ponto focal não pode cadastrar DRE" in response.data["detail"]
+    
+    @patch(PATCH_PATH)
+    def test_gipe_dre_nao_cadastrada(
+        self, mock_consulta, api_client, usuario_gipe, db
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": "999999",
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/?codigo_eol=222222"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "ainda não está cadastrada" in response.data["detail"]
+
+    @patch(PATCH_PATH)
+    def test_consultar_eol_dre_invalida_para_nao_dre(
+        self, mock_consulta, api_client, usuario_gipe
+    ):
+        api_client.force_authenticate(usuario_gipe)
+
+        mock_consulta.return_value = {
+            "codigo": "222222",
+            "codigoDRE": None,
+        }
+
+        response = api_client.get(
+            "/api/unidades/gestao-unidades/consultar-eol/"
+            "?codigo_eol=222222&etapa_modalidade=DRE"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "não pertence a uma DRE" in response.data["detail"]

@@ -103,6 +103,8 @@ class CanApproveUser(BasePermission):
     - PF admin: aprova apenas da(s) DRE(s) dele
     """
 
+    message = "Você não possui permissão para gerenciar usuários."
+
     def has_permission(self, request, view):
         user = request.user
 
