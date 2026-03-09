@@ -220,7 +220,7 @@ class GestaoUsuarioViewSet(ModelViewSet):
 
         EnviaEmailService.enviar(
             destinatario=usuario.email,
-            assunto="Acesso ao Gabinete Integrado de Proteção Escolar (GIPE)",
+            assunto="Acesso a Gestão de Intercorrência de Proteção Escolar (GIPE)",
             template_html="emails/cadastro_recusado.html",
             contexto=contexto_email,
         )
