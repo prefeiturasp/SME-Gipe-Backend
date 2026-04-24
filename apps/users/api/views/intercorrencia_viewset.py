@@ -89,13 +89,8 @@ class IntercorrenciaViewSet(viewsets.ViewSet):
 
         destinatario = user.email
 
-        template_html = (
-            "emails/finalizacao_intercorrencia_dre.html"
-            if user.cargo.codigo == CargoEnum.PONTO_FOCAL_DRE
-            else "emails/finalizacao_intercorrencia_ue.html"
-        )
-
         contexto = {
+            "texto": "vinculada à sua DRE" if user.cargo.codigo == CargoEnum.PONTO_FOCAL_DRE else "por sua Unidade Educacional",
             "data_ocorrencia": data_ocorrencia,
             "url_action": f"{settings.FRONTEND_URL}/dashboard/cadastrar-ocorrencia/{uuid_ocorrencia}",
         }
@@ -107,14 +102,13 @@ class IntercorrenciaViewSet(viewsets.ViewSet):
                     "destinatario": destinatario,
                     "username": username,
                     "uuid_ocorrencia": uuid_ocorrencia,
-                    "template": template_html,
                 },
             )
 
             EnviaEmailService.enviar(
                 destinatario=destinatario,
                 assunto="Intercorrência finalizada pelo GIPE",
-                template_html=template_html,
+                template_html="emails/finalizacao_intercorrencia.html",
                 contexto=contexto,
             )
 
