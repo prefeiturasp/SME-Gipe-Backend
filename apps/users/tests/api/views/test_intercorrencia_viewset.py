@@ -93,7 +93,7 @@ class TestIntercorrenciaViewSet:
         assert response.data["success"] is True
 
         _, kwargs = mock_enviar.call_args
-        assert kwargs["template_html"] == "emails/finalizacao_intercorrencia_dre.html"
+        assert kwargs["template_html"] == "emails/finalizacao_intercorrencia.html"
         assert kwargs["destinatario"] == "dre@test.com"
 
     @patch("apps.users.api.views.intercorrencia_viewset.EnviaEmailService.enviar")
@@ -111,7 +111,7 @@ class TestIntercorrenciaViewSet:
         assert response.status_code == 200
 
         _, kwargs = mock_enviar.call_args
-        assert kwargs["template_html"] == "emails/finalizacao_intercorrencia_ue.html"
+        assert kwargs["template_html"] == "emails/finalizacao_intercorrencia.html"
 
     @patch(
         "apps.users.api.views.intercorrencia_viewset.EnviaEmailService.enviar",
