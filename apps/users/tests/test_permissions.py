@@ -3,7 +3,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 
-from apps.users.permissions import CanManageUsers, CanApproveUser
+from apps.users.permissions import CanManageUsers, CanApproveUser, IsInternalServiceRequest
+
 
 User = get_user_model()
 
@@ -241,4 +242,54 @@ def test_can_approve_user_object_usuario_comum_nao_pode_aprovar(
 
     assert perm.has_object_permission(request, view, outro_user_comum) is False
 
+@pytest.mark.django_db
+def test_internal_service_sem_token_configurado(api_rf, settings):
+    settings.INTERNAL_SERVICE_TOKEN = None
 
+    perm = IsInternalServiceRequest()
+    request = api_rf.get("/fake-url/")
+    request.headers = {}
+
+    view = DummyView(action="any")
+
+    assert perm.has_permission(request, view) is False
+
+@pytest.mark.django_db
+def test_internal_service_sem_header(api_rf, settings):
+    settings.INTERNAL_SERVICE_TOKEN = "token-correto"
+
+    perm = IsInternalServiceRequest()
+    request = api_rf.get("/fake-url/")
+    request.headers = {}
+
+    view = DummyView(action="any")
+
+    assert perm.has_permission(request, view) is False
+
+@pytest.mark.django_db
+def test_internal_service_token_incorreto(api_rf, settings):
+    settings.INTERNAL_SERVICE_TOKEN = "token-correto"
+
+    perm = IsInternalServiceRequest()
+    request = api_rf.get("/fake-url/")
+    request.headers = {
+        "X-Internal-Service-Token": "token-errado"
+    }
+
+    view = DummyView(action="any")
+
+    assert perm.has_permission(request, view) is False
+
+@pytest.mark.django_db
+def test_internal_service_token_correto(api_rf, settings):
+    settings.INTERNAL_SERVICE_TOKEN = "token-correto"
+
+    perm = IsInternalServiceRequest()
+    request = api_rf.get("/fake-url/")
+    request.headers = {
+        "X-Internal-Service-Token": "token-correto"
+    }
+
+    view = DummyView(action="any")
+
+    assert perm.has_permission(request, view) is True
