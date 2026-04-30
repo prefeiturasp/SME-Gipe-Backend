@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework.permissions import BasePermission
 from apps.unidades.models.unidades import TipoUnidadeChoices
 
@@ -133,3 +134,25 @@ class CanApproveUser(BasePermission):
             return _ponto_focal_has_access_to_user(user, obj)
 
         return False
+    
+
+class IsInternalServiceRequest(BasePermission):
+    """
+    Permission para requisições de microserviços internos.
+    Valida um token compartilhado no header X-Internal-Service-Token.
+    """
+    
+    def has_permission(self, request, view):
+        # Token enviado no header
+        token = request.headers.get('X-Internal-Service-Token')
+        
+        # Token esperado (configurado no settings)
+        expected_token = getattr(settings, 'INTERNAL_SERVICE_TOKEN', None)
+        
+        if not expected_token:
+            return False
+        
+        if token != expected_token:
+            return False
+        
+        return True

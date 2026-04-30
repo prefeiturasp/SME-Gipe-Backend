@@ -16,12 +16,13 @@ from apps.users.api.views.senha_viewset import (
     AtualizarSenhaViewSet,
 )
 from apps.users.api.views.gestao_usuario_viewset import GestaoUsuarioViewSet
+from apps.users.api.views.intercorrencia_viewset import IntercorrenciaViewSet
 
 app_name = "users"
 
 router = DefaultRouter()
 router.register(r"gestao-usuarios", GestaoUsuarioViewSet, basename="usuarios-gestao")
-
+router.register(r"intercorrencias", IntercorrenciaViewSet, basename="intercorrencias")
 
 urlpatterns = [
     
