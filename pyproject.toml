@@ -1,3 +1,9 @@
+[project]
+name = "SME-Gipe-Backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
 # ==== pytest ====
 [tool.pytest.ini_options]
 minversion = "6.0"
