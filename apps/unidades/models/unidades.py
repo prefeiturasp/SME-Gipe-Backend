@@ -23,6 +23,15 @@ class TipoUnidadeChoices(models.TextChoices):
     CEU_EMEI = 'CEU EMEI', 'CEU EMEI'
     CEU_CEMEI = 'CEU CEMEI', 'CEU CEMEI'
     CEI_DIRET = 'CEI DIRET', 'CEI DIRET'
+    EMEI_P_FOM = 'EMEI P FOM', 'EMEI P FOM'
+    EMEF_P_FOM = 'EMEF P FOM', 'EMEF P FOM'
+    CR_P_CONV = 'CR.P.CONV', 'CR.P.CONV'
+    CEI_INDIR = 'CEI INDIR', 'CEI INDIR'
+    CCI_CIPS = 'CCI/CIPS', 'CCI/CIPS'
+    MOVA = 'MOVA', 'MOVA'
+    ESP_CONV = 'ESP CONV', 'ESP CONV'
+    CEU_AT_COM = 'CEU AT COM', 'CEU AT COM'
+    CEU_POLO = 'CEU POLO', 'CEU POLO'
 
 
 class TipoGestaoChoices(models.TextChoices):

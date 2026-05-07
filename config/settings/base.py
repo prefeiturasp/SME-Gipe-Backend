@@ -28,6 +28,8 @@ INTERNAL_SERVICE_TOKEN = env(
     default='sua_chave_interna_aqui'
 )
 
+FRONTEND_URL = env('FRONTEND_URL', default="")
+
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
