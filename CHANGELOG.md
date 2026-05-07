@@ -5,10 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-05-07
 
-### Added
-- Estrutura inicial de CI/CD
+### Removed
+- Removidos os arquivos `carga_unidades_viewset` e `carga_unidade_service`
+- Removida a rota relacionada à carga de unidades das URLs
 
 ---
 
@@ -24,3 +25,4 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - Implementação da gestão de perfis (Assistente de Diretor, Diretor de escola, Ponto focal DRE, GIPE)
 - Implementação da gestão de usuários
 - Implementação da gestão de unidades
+- Estrutura inicial de CI/CD
